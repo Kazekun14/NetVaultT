@@ -1,0 +1,447 @@
+import { initDb, execute, queryOne } from './index.js';
+import { hashPassword } from '../services/password.service.js';
+import { encryptSecret } from '../services/encryption.service.js';
+import crypto from 'crypto';
+
+export async function seedDatabase() {
+  console.log('Seeding NetVaultT database...');
+  initDb();
+
+  const now = new Date().toISOString();
+
+  // 1. Seed Permissions
+  const permissionsList = [
+    { code: 'dashboard.view', name: 'View Dashboard', description: 'Access dashboard and statistics' },
+    { code: 'devices.view', name: 'View Devices', description: 'View network device list and details' },
+    { code: 'devices.create', name: 'Create Devices', description: 'Add new network devices' },
+    { code: 'devices.update', name: 'Update Devices', description: 'Edit existing network device details' },
+    { code: 'devices.deactivate', name: 'Deactivate Devices', description: 'Deactivate or decommission devices' },
+    { code: 'credentials.view', name: 'View Credentials', description: 'View credential metadata' },
+    { code: 'credentials.create', name: 'Create Credentials', description: 'Add credentials to devices' },
+    { code: 'credentials.update', name: 'Update Credentials', description: 'Edit credential metadata and passwords' },
+    { code: 'credentials.reveal', name: 'Reveal Credentials', description: 'Decrypt and reveal credential passwords' },
+    { code: 'credentials.copy', name: 'Copy Credentials', description: 'Copy credential passwords to clipboard' },
+    { code: 'credentials.disable', name: 'Disable Credentials', description: 'Disable device credentials' },
+    { code: 'sites.view', name: 'View Sites', description: 'View physical/logical sites' },
+    { code: 'sites.create', name: 'Create Sites', description: 'Add new sites' },
+    { code: 'sites.update', name: 'Update Sites', description: 'Edit existing sites' },
+    { code: 'users.view', name: 'View Users', description: 'View user accounts' },
+    { code: 'users.create', name: 'Create Users', description: 'Create user accounts' },
+    { code: 'users.update', name: 'Update Users', description: 'Edit user accounts and roles' },
+    { code: 'roles.manage', name: 'Manage Roles', description: 'Create and edit roles and permissions' },
+    { code: 'audit.view', name: 'View Audit Logs', description: 'View security and action audit history' },
+    { code: 'settings.manage', name: 'Manage Settings', description: 'Modify global system settings' },
+  ];
+
+  for (const perm of permissionsList) {
+    const existing = queryOne('SELECT id FROM permissions WHERE code = ?', [perm.code]);
+    if (!existing) {
+      const id = crypto.randomUUID();
+      execute(
+        'INSERT INTO permissions (id, code, name, description) VALUES (?, ?, ?, ?)',
+        [id, perm.code, perm.name, perm.description]
+      );
+    }
+  }
+
+  // 2. Seed Roles
+  const rolesList = [
+    {
+      name: 'Super Administrator',
+      description: 'Full unrestricted system access',
+      is_system_role: 1,
+      perms: permissionsList.map((p) => p.code),
+    },
+    {
+      name: 'Network Administrator',
+      description: 'Full device, credential, site, and audit log management',
+      is_system_role: 1,
+      perms: [
+        'dashboard.view',
+        'devices.view',
+        'devices.create',
+        'devices.update',
+        'devices.deactivate',
+        'credentials.view',
+        'credentials.create',
+        'credentials.update',
+        'credentials.reveal',
+        'credentials.copy',
+        'credentials.disable',
+        'sites.view',
+        'sites.create',
+        'sites.update',
+        'audit.view',
+      ],
+    },
+    {
+      name: 'Network Engineer',
+      description: 'View devices and credentials, reveal/copy passwords, edit permitted device info',
+      is_system_role: 1,
+      perms: [
+        'dashboard.view',
+        'devices.view',
+        'devices.update',
+        'credentials.view',
+        'credentials.reveal',
+        'credentials.copy',
+        'sites.view',
+      ],
+    },
+    {
+      name: 'Viewer',
+      description: 'Read-only device and credential metadata inspection',
+      is_system_role: 1,
+      perms: ['dashboard.view', 'devices.view', 'credentials.view', 'sites.view'],
+    },
+  ];
+
+  for (const roleDef of rolesList) {
+    let role = queryOne<{ id: string }>('SELECT id FROM roles WHERE name = ?', [roleDef.name]);
+    let roleId = role?.id;
+
+    if (!roleId) {
+      roleId = crypto.randomUUID();
+      execute(
+        'INSERT INTO roles (id, name, description, is_system_role, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)',
+        [roleId, roleDef.name, roleDef.description, roleDef.is_system_role, now, now]
+      );
+    }
+
+    // Attach permissions
+    for (const code of roleDef.perms) {
+      const perm = queryOne<{ id: string }>('SELECT id FROM permissions WHERE code = ?', [code]);
+      if (perm) {
+        const link = queryOne('SELECT 1 FROM role_permissions WHERE role_id = ? AND permission_id = ?', [
+          roleId,
+          perm.id,
+        ]);
+        if (!link) {
+          execute('INSERT INTO role_permissions (role_id, permission_id) VALUES (?, ?)', [roleId, perm.id]);
+        }
+      }
+    }
+  }
+
+  // 3. Seed Default Super Admin User
+  const superAdminRole = queryOne<{ id: string }>('SELECT id FROM roles WHERE name = ?', ['Super Administrator']);
+  const existingAdmin = queryOne<{ id: string }>('SELECT id FROM users WHERE username = ?', ['admin']);
+
+  let adminUserId = existingAdmin?.id;
+  if (!existingAdmin) {
+    adminUserId = crypto.randomUUID();
+    const adminPasswordHash = await hashPassword('Admin123!NetVaultT');
+    execute(
+      `INSERT INTO users (
+        id, first_name, last_name, username, email, password_hash, status, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [adminUserId, 'System', 'Administrator', 'admin', 'admin@netvaultt.internal', adminPasswordHash, 'ACTIVE', now, now]
+    );
+
+    if (superAdminRole) {
+      execute('INSERT INTO user_roles (user_id, role_id) VALUES (?, ?)', [adminUserId, superAdminRole.id]);
+    }
+  }
+
+  // 4. Seed Device Types
+  const deviceTypesList = [
+    { code: 'ROUTER', name: 'Router', description: 'Core/edge network router' },
+    { code: 'MIKROTIK', name: 'MikroTik', description: 'MikroTik RouterBOARD or Cloud Core Router' },
+    { code: 'OLT', name: 'OLT', description: 'Optical Line Terminal for FTTH' },
+    { code: 'ONU_ONT', name: 'ONU / ONT', description: 'Optical Network Unit / Terminal' },
+    { code: 'SWITCH', name: 'Managed Switch', description: 'Layer 2 / Layer 3 Managed Network Switch' },
+    { code: 'FIREWALL', name: 'Firewall', description: 'Hardware or Virtual Security Firewall' },
+    { code: 'SERVER', name: 'Server', description: 'Linux/Windows Infrastructure Server' },
+    { code: 'NAS', name: 'NAS', description: 'Network Attached Storage' },
+    { code: 'ACCESS_POINT', name: 'Access Point', description: 'Wireless Access Point' },
+    { code: 'IPTV_SERVER', name: 'IPTV Server', description: 'IPTV streaming or middleware server' },
+    { code: 'MONITORING_SERVER', name: 'Monitoring Server', description: 'NMS / Zabbix / Prometheus server' },
+    { code: 'OTHER', name: 'Other', description: 'Other network hardware or appliance' },
+  ];
+
+  for (const dt of deviceTypesList) {
+    const existing = queryOne('SELECT id FROM device_types WHERE code = ?', [dt.code]);
+    if (!existing) {
+      execute('INSERT INTO device_types (id, code, name, description, status) VALUES (?, ?, ?, ?, ?)', [
+        crypto.randomUUID(),
+        dt.code,
+        dt.name,
+        dt.description,
+        'ACTIVE',
+      ]);
+    }
+  }
+
+  // 5. Seed Sites
+  const sitesList = [
+    { code: 'HQ', name: 'Main Office', description: 'Headquarters Data Center', address: '123 Tech Park Ave', contact_person: 'John Doe', contact_number: '+63 917 123 4567' },
+    { code: 'SGY', name: 'SGY Substation', description: 'SGY Regional Distribution Site', address: 'SGY Facility, Highway 45', contact_person: 'Maria Santos', contact_number: '+63 918 234 5678' },
+    { code: 'CLP', name: 'CLP Data Hub', description: 'CLP Central Switching Hub', address: 'CLP Telecom Bldg', contact_person: 'Alex Reyes', contact_number: '+63 919 345 6789' },
+  ];
+
+  for (const site of sitesList) {
+    const existing = queryOne('SELECT id FROM sites WHERE code = ?', [site.code]);
+    if (!existing) {
+      execute(
+        `INSERT INTO sites (id, code, name, description, address, contact_person, contact_number, status, notes, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [crypto.randomUUID(), site.code, site.name, site.description, site.address, site.contact_person, site.contact_number, 'ACTIVE', 'Primary POP', now, now]
+      );
+    }
+  }
+
+  // 6. Seed Sample Devices & Credentials
+  const hqSite = queryOne<{ id: string }>('SELECT id FROM sites WHERE code = ?', ['HQ']);
+  const sgySite = queryOne<{ id: string }>('SELECT id FROM sites WHERE code = ?', ['SGY']);
+  const mikrotikType = queryOne<{ id: string }>('SELECT id FROM device_types WHERE code = ?', ['MIKROTIK']);
+  const oltType = queryOne<{ id: string }>('SELECT id FROM device_types WHERE code = ?', ['OLT']);
+  const iptvType = queryOne<{ id: string }>('SELECT id FROM device_types WHERE code = ?', ['IPTV_SERVER']);
+
+  if (hqSite && mikrotikType) {
+    let coreRtr = queryOne<{ id: string }>('SELECT id FROM devices WHERE device_name = ?', ['CORE-RTR']);
+    let coreRtrId = coreRtr?.id;
+
+    if (!coreRtrId) {
+      coreRtrId = crypto.randomUUID();
+      execute(
+        `INSERT INTO devices (
+          id, device_name, device_type_id, site_id, vendor, model, management_ip, hostname,
+          management_vlan, ssh_port, http_port, https_port, description, status, created_by, updated_by, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          coreRtrId,
+          'CORE-RTR',
+          mikrotikType.id,
+          hqSite.id,
+          'MikroTik',
+          'CCR2004-16G-2S+',
+          '192.168.1.1',
+          'core-rtr.hq.internal',
+          10,
+          22,
+          80,
+          443,
+          'Main HQ Edge Router',
+          'ACTIVE',
+          adminUserId,
+          adminUserId,
+          now,
+          now,
+        ]
+      );
+
+      // Add credential
+      const encrypted = encryptSecret('SuperSecretMikrotikPass123!');
+      const changedAt = new Date().toISOString();
+      const nextRot = new Date(Date.now() + 90 * 86400000).toISOString();
+
+      execute(
+        `INSERT INTO credentials (
+          id, device_id, credential_name, username, encrypted_password, encryption_iv, authentication_tag,
+          encryption_version, protocol, port, login_url, privilege_level, description, password_changed_at,
+          rotation_interval_days, next_rotation_at, status, created_by, updated_by, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          crypto.randomUUID(),
+          coreRtrId,
+          'Web Admin',
+          'admin',
+          encrypted.ciphertext,
+          encrypted.iv,
+          encrypted.authTag,
+          encrypted.version,
+          'HTTPS',
+          443,
+          'https://192.168.1.1',
+          'ADMIN',
+          'Primary Web Admin User',
+          changedAt,
+          90,
+          nextRot,
+          'ACTIVE',
+          adminUserId,
+          adminUserId,
+          now,
+          now,
+        ]
+      );
+    }
+  }
+
+  if (sgySite && oltType) {
+    let sgyOlt = queryOne<{ id: string }>('SELECT id FROM devices WHERE device_name = ?', ['SGY-OLT1']);
+    let sgyOltId = sgyOlt?.id;
+
+    if (!sgyOltId) {
+      sgyOltId = crypto.randomUUID();
+      execute(
+        `INSERT INTO devices (
+          id, device_name, device_type_id, site_id, vendor, model, management_ip, hostname,
+          management_vlan, ssh_port, http_port, https_port, description, status, created_by, updated_by, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          sgyOltId,
+          'SGY-OLT1',
+          oltType.id,
+          sgySite.id,
+          'Huawei',
+          'MA5608T',
+          '192.168.100.20',
+          'sgy-olt1.sgy.internal',
+          100,
+          22,
+          80,
+          443,
+          'SGY Substation OLT',
+          'ACTIVE',
+          adminUserId,
+          adminUserId,
+          now,
+          now,
+        ]
+      );
+
+      const encrypted = encryptSecret('OltSecurePassword2026!');
+      const changedAt = new Date(Date.now() - 85 * 86400000).toISOString(); // 85 days ago -> Due soon!
+      const nextRot = new Date(Date.now() + 5 * 86400000).toISOString();
+
+      execute(
+        `INSERT INTO credentials (
+          id, device_id, credential_name, username, encrypted_password, encryption_iv, authentication_tag,
+          encryption_version, protocol, port, login_url, privilege_level, description, password_changed_at,
+          rotation_interval_days, next_rotation_at, status, created_by, updated_by, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          crypto.randomUUID(),
+          sgyOltId,
+          'CLI Admin',
+          'root',
+          encrypted.ciphertext,
+          encrypted.iv,
+          encrypted.authTag,
+          encrypted.version,
+          'SSH',
+          22,
+          null,
+          'ADMIN',
+          'SSH Root Access',
+          changedAt,
+          90,
+          nextRot,
+          'ACTIVE',
+          adminUserId,
+          adminUserId,
+          now,
+          now,
+        ]
+      );
+    }
+  }
+
+  if (hqSite && iptvType) {
+    let iptvServer = queryOne<{ id: string }>('SELECT id FROM devices WHERE device_name = ?', ['IPTV-SERVER']);
+    let iptvServerId = iptvServer?.id;
+
+    if (!iptvServerId) {
+      iptvServerId = crypto.randomUUID();
+      execute(
+        `INSERT INTO devices (
+          id, device_name, device_type_id, site_id, vendor, model, management_ip, hostname,
+          management_vlan, ssh_port, http_port, https_port, description, status, created_by, updated_by, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          iptvServerId,
+          'IPTV-SERVER',
+          iptvType.id,
+          hqSite.id,
+          'Dell',
+          'PowerEdge R640',
+          '192.168.1.44',
+          'iptv.hq.internal',
+          20,
+          22,
+          80,
+          443,
+          'HQ IPTV Streaming Node',
+          'ACTIVE',
+          adminUserId,
+          adminUserId,
+          now,
+          now,
+        ]
+      );
+
+      const encrypted = encryptSecret('IptvServerPassword99!');
+      const changedAt = new Date().toISOString();
+      const nextRot = new Date(Date.now() + 90 * 86400000).toISOString();
+
+      execute(
+        `INSERT INTO credentials (
+          id, device_id, credential_name, username, encrypted_password, encryption_iv, authentication_tag,
+          encryption_version, protocol, port, login_url, privilege_level, description, password_changed_at,
+          rotation_interval_days, next_rotation_at, status, created_by, updated_by, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          crypto.randomUUID(),
+          iptvServerId,
+          'Root SSH',
+          'root',
+          encrypted.ciphertext,
+          encrypted.iv,
+          encrypted.authTag,
+          encrypted.version,
+          'SSH',
+          22,
+          null,
+          'ADMIN',
+          'System Root Access',
+          changedAt,
+          90,
+          nextRot,
+          'ACTIVE',
+          adminUserId,
+          adminUserId,
+          now,
+          now,
+        ]
+      );
+    }
+  }
+
+  // 7. Seed System Settings
+  const defaultSettings = [
+    { key: 'app_name', value: 'NetVaultT', type: 'string' },
+    { key: 'organization_name', value: 'NetVaultT Enterprise Network', type: 'string' },
+    { key: 'timezone', value: 'Asia/Manila', type: 'string' },
+    { key: 'pagination_size', value: '10', type: 'number' },
+    { key: 'session_timeout', value: '30', type: 'number' },
+    { key: 'require_reauth_reveal', value: 'false', type: 'boolean' },
+    { key: 'reveal_timeout', value: '20', type: 'number' },
+    { key: 'login_attempt_limit', value: '5', type: 'number' },
+    { key: 'account_lock_duration', value: '15', type: 'number' },
+    { key: 'default_rotation_days', value: '90', type: 'number' },
+    { key: 'due_soon_threshold', value: '14', type: 'number' },
+  ];
+
+  for (const s of defaultSettings) {
+    const existing = queryOne('SELECT id FROM system_settings WHERE setting_key = ?', [s.key]);
+    if (!existing) {
+      execute(
+        'INSERT INTO system_settings (id, setting_key, setting_value, setting_type, updated_by, updated_at) VALUES (?, ?, ?, ?, ?, ?)',
+        [crypto.randomUUID(), s.key, s.value, s.type, adminUserId, now]
+      );
+    }
+  }
+
+  console.log('Database seeding finished successfully.');
+}
+
+if (process.argv[1] && process.argv[1].endsWith('seed.ts')) {
+  seedDatabase()
+    .then(() => process.exit(0))
+    .catch((err) => {
+      console.error('Seed error:', err);
+      process.exit(1);
+    });
+}
+
