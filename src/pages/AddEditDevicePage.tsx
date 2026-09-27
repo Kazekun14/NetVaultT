@@ -3,7 +3,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import { apiFetch } from '../lib/api.js';
 import { Device, DeviceType, Site } from '../types/index.js';
 import { useToast } from '../components/common/Toast.js';
-import { ArrowLeft, Save, Server } from 'lucide-react';
+import { ArrowLeft, Save, Router as RouterIcon } from 'lucide-react';
 
 export const AddEditDevicePage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -140,31 +140,34 @@ export const AddEditDevicePage: React.FC = () => {
   }
 
   return (
-    <div className="space-y-6 max-w-4xl mx-auto">
-      <div className="flex items-center justify-between">
-        <Link to="/devices" className="inline-flex items-center gap-2 text-xs font-medium text-slate-400 hover:text-white transition-colors">
-          <ArrowLeft className="w-4 h-4" />
-          Back to Devices
+    <div className="space-y-4 max-w-4xl mx-auto">
+      <div>
+        <Link
+          to="/devices"
+          className="inline-flex items-center gap-2 text-sm font-semibold text-slate-300 hover:text-white transition-colors"
+        >
+          <ArrowLeft className="w-5 h-5 text-cyan-400 shrink-0" />
+          <span>Back</span>
         </Link>
       </div>
 
       <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 sm:p-8 shadow-xl space-y-6">
         <div className="flex items-center gap-3 border-b border-slate-800 pb-4">
-          <div className="w-10 h-10 rounded-xl bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 flex items-center justify-center">
-            <Server className="w-5 h-5" />
+          <div className="w-10 h-10 rounded-xl bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 flex items-center justify-center shrink-0">
+            <RouterIcon className="w-5 h-5" />
           </div>
           <div>
             <h1 className="text-xl font-bold text-white tracking-tight">
-              {isEdit ? 'Edit Network Device' : 'Add New Network Device'}
+              {isEdit ? 'Edit Network Device' : 'Add Network Device'}
             </h1>
-            <p className="text-xs text-slate-400">Configure device specs, management IP, site, and access ports</p>
+            <p className="text-xs text-slate-400">Enter the device details, network information, and management settings.</p>
           </div>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-8">
           {/* Basic Information */}
           <div className="space-y-4">
-            <h2 className="text-xs font-bold text-cyan-400 uppercase tracking-wider">1. Basic Information</h2>
+            <h2 className="text-xs font-bold text-cyan-400 uppercase tracking-wider">Basic Information</h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-1">
                 <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Device Name *</label>
@@ -256,7 +259,7 @@ export const AddEditDevicePage: React.FC = () => {
 
           {/* Network Information */}
           <div className="space-y-4">
-            <h2 className="text-xs font-bold text-cyan-400 uppercase tracking-wider">2. Network Information</h2>
+            <h2 className="text-xs font-bold text-cyan-400 uppercase tracking-wider">Network Information</h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-1">
                 <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Management IP *</label>
@@ -311,7 +314,7 @@ export const AddEditDevicePage: React.FC = () => {
 
           {/* Access Ports */}
           <div className="space-y-4">
-            <h2 className="text-xs font-bold text-cyan-400 uppercase tracking-wider">3. Access Ports</h2>
+            <h2 className="text-xs font-bold text-cyan-400 uppercase tracking-wider">Access Ports</h2>
             <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
               <div className="space-y-1">
                 <label className="text-[11px] font-semibold text-slate-400 uppercase">SSH Port</label>
@@ -368,7 +371,7 @@ export const AddEditDevicePage: React.FC = () => {
 
           {/* Description & Notes */}
           <div className="space-y-4">
-            <h2 className="text-xs font-bold text-cyan-400 uppercase tracking-wider">4. Description & Notes</h2>
+            <h2 className="text-xs font-bold text-cyan-400 uppercase tracking-wider">Description & Notes</h2>
             <div className="space-y-3">
               <div className="space-y-1">
                 <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Description</label>

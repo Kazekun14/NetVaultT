@@ -1,4 +1,4 @@
-import { initDb, execute, queryOne } from '../db/index.js';
+import { initDb, execute, queryOne, transaction, db, databaseErrorCode } from '../db/index.js';
 import { hashPassword } from '../services/password.service.js';
 import crypto from 'crypto';
 import readline from 'readline';
@@ -13,7 +13,7 @@ function ask(question: string): Promise<string> {
 }
 
 async function createAdmin() {
-  initDb();
+  await initDb();
 
   console.log('--- NetVaultT Super Administrator Initialization ---');
   const username = (await ask('Enter Username [admin]: ')).trim() || 'admin';
@@ -25,42 +25,46 @@ async function createAdmin() {
   if (!password || password.length < 8) {
     console.error('Error: Password must be at least 8 characters long.');
     rl.close();
-    process.exit(1);
+    process.exitCode = 1;
+    return;
   }
 
-  const existingUser = queryOne('SELECT id FROM users WHERE username = ? OR email = ?', [username, email]);
+  const existingUser = await queryOne('SELECT id FROM users WHERE username = $1 OR email = $2', [username, email]);
   if (existingUser) {
     console.error(`Error: User with username "${username}" or email "${email}" already exists.`);
     rl.close();
-    process.exit(1);
+    process.exitCode = 1;
+    return;
   }
 
-  const superAdminRole = queryOne<{ id: string }>('SELECT id FROM roles WHERE name = ?', ['Super Administrator']);
+  const superAdminRole = await queryOne<{ id: string }>('SELECT id FROM roles WHERE name = $1', ['Super Administrator']);
   if (!superAdminRole) {
     console.error('Error: Super Administrator role not found in database. Run npm run db:seed first.');
     rl.close();
-    process.exit(1);
+    process.exitCode = 1;
+    return;
   }
 
   const userId = crypto.randomUUID();
   const passwordHash = await hashPassword(password);
   const now = new Date().toISOString();
 
-  execute(
-    `INSERT INTO users (id, first_name, last_name, username, email, password_hash, status, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    [userId, firstName, lastName, username, email, passwordHash, 'ACTIVE', now, now]
-  );
+  await transaction(async () => {
+    await execute(
+      `INSERT INTO users (id, first_name, last_name, username, email, password_hash, status, created_at, updated_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+      [userId, firstName, lastName, username, email, passwordHash, 'ACTIVE', now, now]
+    );
 
-  execute('INSERT INTO user_roles (user_id, role_id) VALUES (?, ?)', [userId, superAdminRole.id]);
+    await execute('INSERT INTO user_roles (user_id, role_id) VALUES ($1, $2)', [userId, superAdminRole.id]);
+  });
 
   console.log(`\nSuper Administrator "${username}" created successfully!`);
   rl.close();
 }
 
 createAdmin().catch((err) => {
-  console.error('Create admin error:', err);
+  console.error('Create admin error:', databaseErrorCode(err));
   rl.close();
-  process.exit(1);
-});
-
+  process.exitCode = 1;
+}).finally(() => db.end());

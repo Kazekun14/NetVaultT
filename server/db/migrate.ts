@@ -1,11 +1,12 @@
-import { initDb } from './index.js';
+import { initDb, db, databaseErrorCode } from './index.js';
 
-console.log('Running NetVaultT database migrations...');
+console.log('Running NetVaultT PostgreSQL schema initialization...');
 try {
-  initDb();
+  await initDb();
   console.log('Database migrations completed successfully.');
 } catch (error) {
-  console.error('Migration failed:', error);
-  process.exit(1);
+  console.error('PostgreSQL initialization failed. Check DB_* configuration and server availability. Code:', databaseErrorCode(error));
+  process.exitCode = 1;
+} finally {
+  await db.end();
 }
-

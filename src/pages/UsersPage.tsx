@@ -102,6 +102,11 @@ export const UsersPage: React.FC = () => {
       return;
     }
 
+    if (formData.username.trim().includes('@')) {
+      showToast('Username cannot be an email address.', 'error');
+      return;
+    }
+
     if (!editingUser && !formData.password) {
       showToast('Password is required for new accounts.', 'error');
       return;

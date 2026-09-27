@@ -1,0 +1,61 @@
+<svg xmlns="http://www.w3.org/2000/svg"
+     viewBox="170 95 220 220"
+     role="img"
+     aria-labelledby="title desc">
+  <title id="title">NetVaultT icon</title>
+  <desc id="desc">A shield containing connected network nodes, representing secure network credential management.</desc>
+
+  <defs>
+    <linearGradient id="shieldGradient" x1="190" y1="210" x2="368" y2="150" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#20283F"/>
+      <stop offset="0.50" stop-color="#213A91"/>
+      <stop offset="1" stop-color="#184BFA"/>
+    </linearGradient>
+
+    <linearGradient id="networkGradient" x1="198" y1="255" x2="352" y2="139" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#20283F"/>
+      <stop offset="0.52" stop-color="#243D96"/>
+      <stop offset="1" stop-color="#184BFA"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Shield -->
+  <path
+    d="M280 104
+       L194 136
+       C194 176 195 210 211 239
+       C225 266 249 290 280 308
+       C311 289 334 268 349 240
+       C361 217 366 183 366 139
+       Z"
+    fill="none"
+    stroke="url(#shieldGradient)"
+    stroke-width="8"
+    stroke-linecap="round"
+    stroke-linejoin="round"/>
+
+  <!-- Network links -->
+  <g fill="none"
+     stroke="url(#networkGradient)"
+     stroke-width="7"
+     stroke-linecap="round"
+     stroke-linejoin="round">
+    <path d="M227.5 162.5 L279.5 206.5"/>
+    <path d="M279.5 206.5 L351.5 138.5"/>
+    <path d="M198.5 254.5 L279.5 206.5"/>
+    <path d="M279.5 206.5 L333.5 262.5"/>
+  </g>
+
+  <!-- Main connected nodes -->
+  <circle cx="227.5" cy="162.5" r="18.2" fill="#213C91"/>
+  <circle cx="279.5" cy="206.5" r="26" fill="#243F9C"/>
+  <circle cx="351.5" cy="138.5" r="17.8" fill="#184BFA"/>
+  <circle cx="198.5" cy="254.5" r="17.4" fill="#20283F"/>
+  <circle cx="333.5" cy="262.5" r="14.4" fill="#294A9F"/>
+
+  <!-- Smaller network nodes -->
+  <circle cx="282.5" cy="153.5" r="9.6" fill="#2446BA"/>
+  <circle cx="222.5" cy="203.5" r="9.6" fill="#294486"/>
+  <circle cx="338.5" cy="201.5" r="11" fill="#2148C1"/>
+  <circle cx="269.5" cy="251.5" r="12.1" fill="#243C83"/>
+</svg>

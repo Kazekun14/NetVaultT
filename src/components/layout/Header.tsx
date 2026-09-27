@@ -14,7 +14,7 @@ export const Header: React.FC<HeaderProps> = ({ setMobileOpen }) => {
 
   const handleLogout = async () => {
     await logout();
-    navigate('/login');
+    navigate('/signin');
   };
 
   const primaryRole = user?.roles?.[0]?.name || 'User';

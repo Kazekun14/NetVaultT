@@ -103,7 +103,7 @@ export const RevealModal: React.FC<RevealModalProps> = ({
                   className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors"
                   title={showPlain ? 'Hide' : 'Show'}
                 >
-                  {showPlain ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  {showPlain ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
                 </button>
                 <button
                   onClick={handleCopy}

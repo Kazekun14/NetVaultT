@@ -1,3 +1,4 @@
+import { asyncHandler } from '../middleware/async.middleware.js';
 import { Router } from 'express';
 import { query, queryOne, execute } from '../db/index.js';
 import { comparePassword, hashPassword } from '../services/password.service.js';
@@ -7,7 +8,7 @@ import { loginLimiter } from '../middleware/rateLimit.middleware.js';
 
 const router = Router();
 
-router.post('/login', loginLimiter, async (req, res) => {
+router.post('/login', loginLimiter, asyncHandler(async (req, res) => {
   const { username, password } = req.body;
   const ipAddress = req.ip || req.socket.remoteAddress || '127.0.0.1';
   const userAgent = req.headers['user-agent'] || 'Unknown';
@@ -16,7 +17,11 @@ router.post('/login', loginLimiter, async (req, res) => {
     return res.status(400).json({ success: false, message: 'Username and password are required.' });
   }
 
-  const user = queryOne<{
+  if (username.includes('@')) {
+    return res.status(400).json({ success: false, message: 'Please enter a valid username. Email addresses are not supported.' });
+  }
+
+  const user = await queryOne<{
     id: string;
     first_name: string;
     last_name: string;
@@ -24,13 +29,12 @@ router.post('/login', loginLimiter, async (req, res) => {
     email: string;
     password_hash: string;
     status: string;
-  }>('SELECT id, first_name, last_name, username, email, password_hash, status FROM users WHERE username = ? OR email = ?', [
-    username.trim(),
+  }>('SELECT id, first_name, last_name, username, email, password_hash, status FROM users WHERE username = $1', [
     username.trim(),
   ]);
 
   if (!user || !(await comparePassword(password, user.password_hash))) {
-    logAudit({
+    await logAudit({
       usernameSnapshot: username,
       action: 'LOGIN_FAILURE',
       resourceType: 'AUTH',
@@ -43,7 +47,7 @@ router.post('/login', loginLimiter, async (req, res) => {
   }
 
   if (user.status !== 'ACTIVE') {
-    logAudit({
+    await logAudit({
       userId: user.id,
       usernameSnapshot: user.username,
       action: 'LOGIN_FAILURE',
@@ -58,30 +62,30 @@ router.post('/login', loginLimiter, async (req, res) => {
 
   // Update last login
   const now = new Date().toISOString();
-  execute('UPDATE users SET last_login_at = ?, last_login_ip = ? WHERE id = ?', [now, ipAddress, user.id]);
+  await execute('UPDATE users SET last_login_at = $1, last_login_ip = $2 WHERE id = $3', [now, ipAddress, user.id]);
 
   // Set session
   (req.session as any).userId = user.id;
 
   // Fetch permissions
-  const permsRows = query<{ code: string }>(
+  const permsRows = await query<{ code: string }>(
     `SELECT DISTINCT p.code
      FROM permissions p
      JOIN role_permissions rp ON p.id = rp.permission_id
      JOIN user_roles ur ON rp.role_id = ur.role_id
-     WHERE ur.user_id = ?`,
+     WHERE ur.user_id = $1`,
     [user.id]
   );
 
-  const rolesRows = query<{ id: string; name: string }>(
+  const rolesRows = await query<{ id: string; name: string }>(
     `SELECT r.id, r.name
      FROM roles r
      JOIN user_roles ur ON r.id = ur.role_id
-     WHERE ur.user_id = ?`,
+     WHERE ur.user_id = $1`,
     [user.id]
   );
 
-  logAudit({
+  await logAudit({
     userId: user.id,
     usernameSnapshot: user.username,
     action: 'LOGIN_SUCCESS',
@@ -103,11 +107,11 @@ router.post('/login', loginLimiter, async (req, res) => {
       permissions: permsRows.map((r) => r.code),
     },
   });
-});
+}));
 
-router.post('/logout', requireAuth, (req: AuthRequest, res) => {
+router.post('/logout', requireAuth, asyncHandler(async (req: AuthRequest, res) => {
   if (req.user) {
-    logAudit({
+    await logAudit({
       userId: req.user.id,
       usernameSnapshot: req.user.username,
       action: 'LOGOUT',
@@ -124,15 +128,15 @@ router.post('/logout', requireAuth, (req: AuthRequest, res) => {
     res.clearCookie('connect.sid');
     res.json({ success: true, message: 'Logged out successfully.' });
   });
-});
+}));
 
-router.get('/me', requireAuth, (req: AuthRequest, res) => {
+router.get('/me', requireAuth, asyncHandler(async (req: AuthRequest, res) => {
   const user = req.user!;
-  const rolesRows = query<{ id: string; name: string }>(
+  const rolesRows = await query<{ id: string; name: string }>(
     `SELECT r.id, r.name
      FROM roles r
      JOIN user_roles ur ON r.id = ur.role_id
-     WHERE ur.user_id = ?`,
+     WHERE ur.user_id = $1`,
     [user.id]
   );
 
@@ -149,9 +153,9 @@ router.get('/me', requireAuth, (req: AuthRequest, res) => {
       permissions: user.permissions,
     },
   });
-});
+}));
 
-router.post('/change-password', requireAuth, async (req: AuthRequest, res) => {
+router.post('/change-password', requireAuth, asyncHandler(async (req: AuthRequest, res) => {
   const { currentPassword, newPassword } = req.body;
   if (!currentPassword || !newPassword) {
     return res.status(400).json({ success: false, message: 'Current password and new password are required.' });
@@ -161,15 +165,15 @@ router.post('/change-password', requireAuth, async (req: AuthRequest, res) => {
     return res.status(400).json({ success: false, message: 'New password must be at least 8 characters long.' });
   }
 
-  const userDb = queryOne<{ password_hash: string }>('SELECT password_hash FROM users WHERE id = ?', [req.user!.id]);
+  const userDb = await queryOne<{ password_hash: string }>('SELECT password_hash FROM users WHERE id = $1', [req.user!.id]);
   if (!userDb || !(await comparePassword(currentPassword, userDb.password_hash))) {
     return res.status(400).json({ success: false, message: 'Incorrect current password.' });
   }
 
   const newHash = await hashPassword(newPassword);
-  execute('UPDATE users SET password_hash = ?, updated_at = ? WHERE id = ?', [newHash, new Date().toISOString(), req.user!.id]);
+  await execute('UPDATE users SET password_hash = $1, updated_at = $2 WHERE id = $3', [newHash, new Date().toISOString(), req.user!.id]);
 
-  logAudit({
+  await logAudit({
     userId: req.user!.id,
     usernameSnapshot: req.user!.username,
     action: 'USER_UPDATED',
@@ -182,7 +186,7 @@ router.post('/change-password', requireAuth, async (req: AuthRequest, res) => {
   });
 
   res.json({ success: true, message: 'Password changed successfully.' });
-});
+}));
 
 export default router;
 

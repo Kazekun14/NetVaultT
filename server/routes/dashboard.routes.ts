@@ -1,19 +1,20 @@
+import { asyncHandler } from '../middleware/async.middleware.js';
 import { Router } from 'express';
 import { query, queryOne } from '../db/index.js';
 import { requireAuth, requirePermission, AuthRequest } from '../middleware/auth.middleware.js';
 
 const router = Router();
 
-router.get('/summary', requireAuth, requirePermission('dashboard.view'), (req: AuthRequest, res) => {
-  const totalDevicesRow = queryOne<{ count: number }>('SELECT COUNT(*) as count FROM devices');
-  const activeDevicesRow = queryOne<{ count: number }>('SELECT COUNT(*) as count FROM devices WHERE status = ?', ['ACTIVE']);
-  const inactiveDevicesRow = queryOne<{ count: number }>('SELECT COUNT(*) as count FROM devices WHERE status != ?', ['ACTIVE']);
-  const totalCredentialsRow = queryOne<{ count: number }>('SELECT COUNT(*) as count FROM credentials WHERE status = ?', ['ACTIVE']);
-  const totalSitesRow = queryOne<{ count: number }>('SELECT COUNT(*) as count FROM sites WHERE status = ?', ['ACTIVE']);
-  const totalUsersRow = queryOne<{ count: number }>('SELECT COUNT(*) as count FROM users WHERE status = ?', ['ACTIVE']);
+router.get('/summary', requireAuth, requirePermission('dashboard.view'), asyncHandler(async (req: AuthRequest, res) => {
+  const totalDevicesRow = await queryOne<{ count: number }>('SELECT COUNT(*)::int as count FROM devices');
+  const activeDevicesRow = await queryOne<{ count: number }>('SELECT COUNT(*)::int as count FROM devices WHERE status = $1', ['ACTIVE']);
+  const inactiveDevicesRow = await queryOne<{ count: number }>('SELECT COUNT(*)::int as count FROM devices WHERE status != $1', ['ACTIVE']);
+  const totalCredentialsRow = await queryOne<{ count: number }>('SELECT COUNT(*)::int as count FROM credentials WHERE status = $1', ['ACTIVE']);
+  const totalSitesRow = await queryOne<{ count: number }>('SELECT COUNT(*)::int as count FROM sites WHERE status = $1', ['ACTIVE']);
+  const totalUsersRow = await queryOne<{ count: number }>('SELECT COUNT(*)::int as count FROM users WHERE status = $1', ['ACTIVE']);
 
   // Fetch all active credentials to compute rotation alerts
-  const credentials = query<{
+  const credentials = await query<{
     id: string;
     credential_name: string;
     username: string;
@@ -53,8 +54,8 @@ router.get('/summary', requireAuth, requirePermission('dashboard.view'), (req: A
   rotationAlerts.sort((a, b) => a.daysRemaining - b.daysRemaining);
 
   // Devices by Type
-  const devicesByType = query<{ type_code: string; type_name: string; count: number }>(
-    `SELECT dt.code as type_code, dt.name as type_name, COUNT(d.id) as count
+  const devicesByType = await query<{ type_code: string; type_name: string; count: number }>(
+    `SELECT dt.code as type_code, dt.name as type_name, COUNT(d.id)::int as count
      FROM device_types dt
      LEFT JOIN devices d ON dt.id = d.device_type_id
      GROUP BY dt.id, dt.code, dt.name
@@ -62,7 +63,7 @@ router.get('/summary', requireAuth, requirePermission('dashboard.view'), (req: A
   );
 
   // Recently Added Devices
-  const recentlyAddedDevices = query(
+  const recentlyAddedDevices = await query(
     `SELECT d.id, d.device_name, d.management_ip, d.status, d.created_at, dt.name as device_type_name, s.name as site_name
      FROM devices d
      JOIN device_types dt ON d.device_type_id = dt.id
@@ -72,11 +73,11 @@ router.get('/summary', requireAuth, requirePermission('dashboard.view'), (req: A
   );
 
   // Recent Credential Activity (SAFE audit log entries)
-  const recentCredentialActivity = query(
+  const recentCredentialActivity = await query(
     `SELECT a.id, a.username_snapshot as user, a.action, a.resource_name as credential, a.created_at as timestamp, a.ip_address as ip, d.device_name
      FROM audit_logs a
      LEFT JOIN devices d ON a.device_id = d.id
-     WHERE a.resource_type = 'CREDENTIAL' OR a.action LIKE 'CREDENTIAL_%'
+     WHERE a.resource_type = 'CREDENTIAL' OR a.action ILIKE 'CREDENTIAL_%'
      ORDER BY a.created_at DESC
      LIMIT 7`
   );
@@ -97,7 +98,7 @@ router.get('/summary', requireAuth, requirePermission('dashboard.view'), (req: A
     recentCredentialActivity,
     rotationAlerts: rotationAlerts.slice(0, 10),
   });
-});
+}));
 
 export default router;
 

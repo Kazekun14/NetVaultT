@@ -1,3 +1,4 @@
+import { asyncHandler } from '../middleware/async.middleware.js';
 import { Router } from 'express';
 import { query, queryOne, execute, transaction } from '../db/index.js';
 import { requireAuth, requirePermission, AuthRequest } from '../middleware/auth.middleware.js';
@@ -7,45 +8,46 @@ import crypto from 'crypto';
 const router = Router();
 
 // List Roles
-router.get('/', requireAuth, (req, res) => {
-  const roles = query('SELECT * FROM roles ORDER BY name ASC');
+router.get('/', requireAuth, asyncHandler(async (req, res) => {
+  const roles = await query('SELECT * FROM roles ORDER BY name ASC');
 
-  const formattedRoles = roles.map((r) => {
-    const permissions = query<{ id: string; code: string; name: string }>(
+  const formattedRoles = [];
+  for (const r of roles) {
+    const permissions = await query<{ id: string; code: string; name: string }>(
       `SELECT p.id, p.code, p.name
        FROM permissions p
        JOIN role_permissions rp ON p.id = rp.permission_id
-       WHERE rp.role_id = ?`,
+       WHERE rp.role_id = $1`,
       [r.id]
     );
 
-    const userCountRow = queryOne<{ count: number }>('SELECT COUNT(*) as count FROM user_roles WHERE role_id = ?', [r.id]);
+    const userCountRow = await queryOne<{ count: number }>('SELECT COUNT(*)::int as count FROM user_roles WHERE role_id = $1', [r.id]);
 
-    return {
+    formattedRoles.push({
       ...r,
       permissions,
       userCount: userCountRow?.count || 0,
-    };
-  });
+    });
+  }
 
   res.json({ success: true, roles: formattedRoles });
-});
+}));
 
 // List Permissions
-router.get('/permissions', requireAuth, (req, res) => {
-  const permissions = query('SELECT * FROM permissions ORDER BY code ASC');
+router.get('/permissions', requireAuth, asyncHandler(async (req, res) => {
+  const permissions = await query('SELECT * FROM permissions ORDER BY code ASC');
   res.json({ success: true, permissions });
-});
+}));
 
 // Create Role
-router.post('/', requireAuth, requirePermission('roles.manage'), (req: AuthRequest, res) => {
+router.post('/', requireAuth, requirePermission('roles.manage'), asyncHandler(async (req: AuthRequest, res) => {
   const { name, description, permissionCodes } = req.body;
 
   if (!name) {
     return res.status(400).json({ success: false, message: 'Role name is required.' });
   }
 
-  const existing = queryOne('SELECT id FROM roles WHERE name = ?', [name.trim()]);
+  const existing = await queryOne('SELECT id FROM roles WHERE name = $1', [name.trim()]);
   if (existing) {
     return res.status(409).json({ success: false, message: `Role '${name}' already exists.` });
   }
@@ -53,23 +55,23 @@ router.post('/', requireAuth, requirePermission('roles.manage'), (req: AuthReque
   const roleId = crypto.randomUUID();
   const now = new Date().toISOString();
 
-  transaction(() => {
-    execute(
-      'INSERT INTO roles (id, name, description, is_system_role, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)',
+  await transaction(async () => {
+    await execute(
+      'INSERT INTO roles (id, name, description, is_system_role, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, $6)',
       [roleId, name.trim(), description || null, 0, now, now]
     );
 
     if (Array.isArray(permissionCodes)) {
       for (const code of permissionCodes) {
-        const perm = queryOne<{ id: string }>('SELECT id FROM permissions WHERE code = ?', [code]);
+        const perm = await queryOne<{ id: string }>('SELECT id FROM permissions WHERE code = $1', [code]);
         if (perm) {
-          execute('INSERT INTO role_permissions (role_id, permission_id) VALUES (?, ?)', [roleId, perm.id]);
+          await execute('INSERT INTO role_permissions (role_id, permission_id) VALUES ($1, $2)', [roleId, perm.id]);
         }
       }
     }
   });
 
-  logAudit({
+  await logAudit({
     userId: req.user!.id,
     usernameSnapshot: req.user!.username,
     action: 'ROLE_CHANGED',
@@ -81,42 +83,42 @@ router.post('/', requireAuth, requirePermission('roles.manage'), (req: AuthReque
   });
 
   res.status(201).json({ success: true, message: 'Role created successfully.', roleId });
-});
+}));
 
 // Update Role Permissions
-router.patch('/:id', requireAuth, requirePermission('roles.manage'), (req: AuthRequest, res) => {
+router.patch('/:id', requireAuth, requirePermission('roles.manage'), asyncHandler(async (req: AuthRequest, res) => {
   const { id } = req.params;
   const { name, description, permissionCodes } = req.body;
 
-  const existing = queryOne<{ id: string; name: string; is_system_role: number }>('SELECT id, name, is_system_role FROM roles WHERE id = ?', [id]);
+  const existing = await queryOne<{ id: string; name: string; is_system_role: number }>('SELECT id, name, is_system_role FROM roles WHERE id = $1', [id]);
   if (!existing) {
     return res.status(404).json({ success: false, message: 'Role not found.' });
   }
 
   const now = new Date().toISOString();
 
-  transaction(() => {
-    execute(
+  await transaction(async () => {
+    await execute(
       `UPDATE roles SET
-        name = COALESCE(?, name),
-        description = COALESCE(?, description),
-        updated_at = ?
-       WHERE id = ?`,
+        name = COALESCE($1, name),
+        description = COALESCE($2, description),
+        updated_at = $3
+       WHERE id = $4`,
       [name?.trim() || null, description !== undefined ? description : null, now, id]
     );
 
     if (Array.isArray(permissionCodes)) {
-      execute('DELETE FROM role_permissions WHERE role_id = ?', [id]);
+      await execute('DELETE FROM role_permissions WHERE role_id = $1', [id]);
       for (const code of permissionCodes) {
-        const perm = queryOne<{ id: string }>('SELECT id FROM permissions WHERE code = ?', [code]);
+        const perm = await queryOne<{ id: string }>('SELECT id FROM permissions WHERE code = $1', [code]);
         if (perm) {
-          execute('INSERT INTO role_permissions (role_id, permission_id) VALUES (?, ?)', [id, perm.id]);
+          await execute('INSERT INTO role_permissions (role_id, permission_id) VALUES ($1, $2)', [id, perm.id]);
         }
       }
     }
   });
 
-  logAudit({
+  await logAudit({
     userId: req.user!.id,
     usernameSnapshot: req.user!.username,
     action: 'PERMISSION_CHANGED',
@@ -128,7 +130,7 @@ router.patch('/:id', requireAuth, requirePermission('roles.manage'), (req: AuthR
   });
 
   res.json({ success: true, message: 'Role permissions updated successfully.' });
-});
+}));
 
 export default router;
 

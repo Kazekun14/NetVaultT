@@ -1,3 +1,4 @@
+import { asyncHandler } from '../middleware/async.middleware.js';
 import { Router } from 'express';
 import { query, queryOne, execute } from '../db/index.js';
 import { requireAuth, requirePermission, AuthRequest } from '../middleware/auth.middleware.js';
@@ -7,13 +8,13 @@ import crypto from 'crypto';
 const router = Router();
 
 // Device types list helper
-router.get('/types', requireAuth, requirePermission('devices.view'), (req, res) => {
-  const types = query('SELECT * FROM device_types WHERE status = ? ORDER BY name ASC', ['ACTIVE']);
+router.get('/types', requireAuth, requirePermission('devices.view'), asyncHandler(async (req, res) => {
+  const types = await query('SELECT * FROM device_types WHERE status = $1 ORDER BY name ASC', ['ACTIVE']);
   res.json({ success: true, deviceTypes: types });
-});
+}));
 
 // List devices with search, pagination, and filters
-router.get('/', requireAuth, requirePermission('devices.view'), (req: AuthRequest, res) => {
+router.get('/', requireAuth, requirePermission('devices.view'), asyncHandler(async (req: AuthRequest, res) => {
   const { search, typeId, siteId, status, vendor, page = '1', limit = '10', sortBy = 'device_name', sortOrder = 'ASC' } = req.query;
 
   const pageNum = Math.max(1, parseInt(page as string, 10) || 1);
@@ -24,28 +25,28 @@ router.get('/', requireAuth, requirePermission('devices.view'), (req: AuthReques
   const params: any[] = [];
 
   if (typeId) {
-    whereClauses.push('d.device_type_id = ?');
+    whereClauses.push(`d.device_type_id = $${params.length + 1}`);
     params.push(typeId);
   }
 
   if (siteId) {
-    whereClauses.push('d.site_id = ?');
+    whereClauses.push(`d.site_id = $${params.length + 1}`);
     params.push(siteId);
   }
 
   if (status) {
-    whereClauses.push('d.status = ?');
+    whereClauses.push(`d.status = $${params.length + 1}`);
     params.push(status);
   }
 
   if (vendor) {
-    whereClauses.push('d.vendor LIKE ?');
+    whereClauses.push(`d.vendor ILIKE $${params.length + 1}`);
     params.push(`%${vendor}%`);
   }
 
   if (search) {
     whereClauses.push(
-      '(d.device_name LIKE ? OR d.management_ip LIKE ? OR d.hostname LIKE ? OR d.vendor LIKE ? OR d.model LIKE ? OR d.serial_number LIKE ? OR s.name LIKE ?)'
+      `(d.device_name ILIKE $${params.length + 1} OR d.management_ip ILIKE $${params.length + 2} OR d.hostname ILIKE $${params.length + 3} OR d.vendor ILIKE $${params.length + 4} OR d.model ILIKE $${params.length + 5} OR d.serial_number ILIKE $${params.length + 6} OR s.name ILIKE $${params.length + 7})`
     );
     const term = `%${search}%`;
     params.push(term, term, term, term, term, term, term);
@@ -53,8 +54,8 @@ router.get('/', requireAuth, requirePermission('devices.view'), (req: AuthReques
 
   const whereSql = whereClauses.join(' AND ');
 
-  const countRow = queryOne<{ count: number }>(
-    `SELECT COUNT(*) as count
+  const countRow = await queryOne<{ count: number }>(
+    `SELECT COUNT(*)::int as count
      FROM devices d
      JOIN sites s ON d.site_id = s.id
      JOIN device_types dt ON d.device_type_id = dt.id
@@ -77,15 +78,15 @@ router.get('/', requireAuth, requirePermission('devices.view'), (req: AuthReques
   const sortCol = allowedSortCols[sortBy as string] || 'd.device_name';
   const sortDir = (sortOrder as string).toUpperCase() === 'DESC' ? 'DESC' : 'ASC';
 
-  const items = query(
+  const items = await query(
     `SELECT d.*, s.name as site_name, s.code as site_code, dt.name as device_type_name, dt.code as device_type_code,
-            (SELECT COUNT(*) FROM credentials c WHERE c.device_id = d.id) as credential_count
+            (SELECT COUNT(*)::int FROM credentials c WHERE c.device_id = d.id) as credential_count
      FROM devices d
      JOIN sites s ON d.site_id = s.id
      JOIN device_types dt ON d.device_type_id = dt.id
      WHERE ${whereSql}
      ORDER BY ${sortCol} ${sortDir}
-     LIMIT ? OFFSET ?`,
+     LIMIT $${params.length + 1} OFFSET $${params.length + 2}`,
     [...params, limitNum, offset]
   );
 
@@ -99,18 +100,18 @@ router.get('/', requireAuth, requirePermission('devices.view'), (req: AuthReques
       totalPages: Math.ceil(total / limitNum),
     },
   });
-});
+}));
 
 // Single Device Details with Masked Credentials
-router.get('/:id', requireAuth, requirePermission('devices.view'), (req: AuthRequest, res) => {
+router.get('/:id', requireAuth, requirePermission('devices.view'), asyncHandler(async (req: AuthRequest, res) => {
   const { id } = req.params;
 
-  const device = queryOne(
+  const device = await queryOne(
     `SELECT d.*, s.name as site_name, s.code as site_code, dt.name as device_type_name, dt.code as device_type_code
      FROM devices d
      JOIN sites s ON d.site_id = s.id
      JOIN device_types dt ON d.device_type_id = dt.id
-     WHERE d.id = ?`,
+     WHERE d.id = $1`,
     [id]
   );
 
@@ -119,11 +120,11 @@ router.get('/:id', requireAuth, requirePermission('devices.view'), (req: AuthReq
   }
 
   // Fetch credentials WITHOUT returning encrypted password / iv / auth tag
-  const credentials = query(
+  const credentials = await query(
     `SELECT id, device_id, credential_name, username, protocol, port, login_url, privilege_level, description,
             password_changed_at, rotation_interval_days, next_rotation_at, status, created_at, updated_at
      FROM credentials
-     WHERE device_id = ?
+     WHERE device_id = $1
      ORDER BY credential_name ASC`,
     [id]
   );
@@ -138,10 +139,10 @@ router.get('/:id', requireAuth, requirePermission('devices.view'), (req: AuthReq
       })),
     },
   });
-});
+}));
 
 // Create Device
-router.post('/', requireAuth, requirePermission('devices.create'), (req: AuthRequest, res) => {
+router.post('/', requireAuth, requirePermission('devices.create'), asyncHandler(async (req: AuthRequest, res) => {
   const {
     device_name,
     device_type_id,
@@ -192,13 +193,13 @@ router.post('/', requireAuth, requirePermission('devices.create'), (req: AuthReq
   const id = crypto.randomUUID();
   const now = new Date().toISOString();
 
-  execute(
+  await execute(
     `INSERT INTO devices (
       id, device_name, device_type_id, site_id, vendor, model, management_ip, hostname,
       management_vlan, mac_address, serial_number, asset_tag, ssh_port, http_port, https_port,
       telnet_port, snmp_port, firmware_version, software_version, rack, rack_unit, physical_location,
       uplink, parent_device, description, notes, status, created_by, updated_by, created_at, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31)`,
     [
       id,
       device_name.trim(),
@@ -234,7 +235,7 @@ router.post('/', requireAuth, requirePermission('devices.create'), (req: AuthReq
     ]
   );
 
-  logAudit({
+  await logAudit({
     userId: req.user!.id,
     usernameSnapshot: req.user!.username,
     action: 'DEVICE_CREATED',
@@ -247,12 +248,12 @@ router.post('/', requireAuth, requirePermission('devices.create'), (req: AuthReq
   });
 
   res.status(201).json({ success: true, message: 'Device created successfully.', deviceId: id });
-});
+}));
 
 // Update Device
-router.patch('/:id', requireAuth, requirePermission('devices.update'), (req: AuthRequest, res) => {
+router.patch('/:id', requireAuth, requirePermission('devices.update'), asyncHandler(async (req: AuthRequest, res) => {
   const { id } = req.params;
-  const existing = queryOne<{ id: string; device_name: string }>('SELECT id, device_name FROM devices WHERE id = ?', [id]);
+  const existing = await queryOne<{ id: string; device_name: string }>('SELECT id, device_name FROM devices WHERE id = $1', [id]);
   if (!existing) {
     return res.status(404).json({ success: false, message: 'Device not found.' });
   }
@@ -288,37 +289,37 @@ router.patch('/:id', requireAuth, requirePermission('devices.update'), (req: Aut
 
   const now = new Date().toISOString();
 
-  execute(
+  await execute(
     `UPDATE devices SET
-      device_name = COALESCE(?, device_name),
-      device_type_id = COALESCE(?, device_type_id),
-      site_id = COALESCE(?, site_id),
-      vendor = COALESCE(?, vendor),
-      model = COALESCE(?, model),
-      management_ip = COALESCE(?, management_ip),
-      hostname = COALESCE(?, hostname),
-      management_vlan = COALESCE(?, management_vlan),
-      mac_address = COALESCE(?, mac_address),
-      serial_number = COALESCE(?, serial_number),
-      asset_tag = COALESCE(?, asset_tag),
-      ssh_port = COALESCE(?, ssh_port),
-      http_port = COALESCE(?, http_port),
-      https_port = COALESCE(?, https_port),
-      telnet_port = COALESCE(?, telnet_port),
-      snmp_port = COALESCE(?, snmp_port),
-      firmware_version = COALESCE(?, firmware_version),
-      software_version = COALESCE(?, software_version),
-      rack = COALESCE(?, rack),
-      rack_unit = COALESCE(?, rack_unit),
-      physical_location = COALESCE(?, physical_location),
-      uplink = COALESCE(?, uplink),
-      parent_device = COALESCE(?, parent_device),
-      description = COALESCE(?, description),
-      notes = COALESCE(?, notes),
-      status = COALESCE(?, status),
-      updated_by = ?,
-      updated_at = ?
-     WHERE id = ?`,
+      device_name = COALESCE($1, device_name),
+      device_type_id = COALESCE($2, device_type_id),
+      site_id = COALESCE($3, site_id),
+      vendor = COALESCE($4, vendor),
+      model = COALESCE($5, model),
+      management_ip = COALESCE($6, management_ip),
+      hostname = COALESCE($7, hostname),
+      management_vlan = COALESCE($8, management_vlan),
+      mac_address = COALESCE($9, mac_address),
+      serial_number = COALESCE($10, serial_number),
+      asset_tag = COALESCE($11, asset_tag),
+      ssh_port = COALESCE($12, ssh_port),
+      http_port = COALESCE($13, http_port),
+      https_port = COALESCE($14, https_port),
+      telnet_port = COALESCE($15, telnet_port),
+      snmp_port = COALESCE($16, snmp_port),
+      firmware_version = COALESCE($17, firmware_version),
+      software_version = COALESCE($18, software_version),
+      rack = COALESCE($19, rack),
+      rack_unit = COALESCE($20, rack_unit),
+      physical_location = COALESCE($21, physical_location),
+      uplink = COALESCE($22, uplink),
+      parent_device = COALESCE($23, parent_device),
+      description = COALESCE($24, description),
+      notes = COALESCE($25, notes),
+      status = COALESCE($26, status),
+      updated_by = $27,
+      updated_at = $28
+     WHERE id = $29`,
     [
       device_name || null,
       device_type_id || null,
@@ -352,7 +353,7 @@ router.patch('/:id', requireAuth, requirePermission('devices.update'), (req: Aut
     ]
   );
 
-  logAudit({
+  await logAudit({
     userId: req.user!.id,
     usernameSnapshot: req.user!.username,
     action: 'DEVICE_UPDATED',
@@ -365,12 +366,12 @@ router.patch('/:id', requireAuth, requirePermission('devices.update'), (req: Aut
   });
 
   res.json({ success: true, message: 'Device updated successfully.' });
-});
+}));
 
 // Deactivate Device
-router.post('/:id/deactivate', requireAuth, requirePermission('devices.deactivate'), (req: AuthRequest, res) => {
+router.post('/:id/deactivate', requireAuth, requirePermission('devices.deactivate'), asyncHandler(async (req: AuthRequest, res) => {
   const { id } = req.params;
-  const existing = queryOne<{ id: string; device_name: string }>('SELECT id, device_name FROM devices WHERE id = ?', [id]);
+  const existing = await queryOne<{ id: string; device_name: string }>('SELECT id, device_name FROM devices WHERE id = $1', [id]);
   if (!existing) {
     return res.status(404).json({ success: false, message: 'Device not found.' });
   }
@@ -378,9 +379,9 @@ router.post('/:id/deactivate', requireAuth, requirePermission('devices.deactivat
   const { status = 'DECOMMISSIONED' } = req.body;
   const now = new Date().toISOString();
 
-  execute('UPDATE devices SET status = ?, updated_by = ?, updated_at = ? WHERE id = ?', [status, req.user!.id, now, id]);
+  await execute('UPDATE devices SET status = $1, updated_by = $2, updated_at = $3 WHERE id = $4', [status, req.user!.id, now, id]);
 
-  logAudit({
+  await logAudit({
     userId: req.user!.id,
     usernameSnapshot: req.user!.username,
     action: 'DEVICE_DEACTIVATED',
@@ -394,7 +395,7 @@ router.post('/:id/deactivate', requireAuth, requirePermission('devices.deactivat
   });
 
   res.json({ success: true, message: `Device marked as ${status} successfully.` });
-});
+}));
 
 export default router;
 

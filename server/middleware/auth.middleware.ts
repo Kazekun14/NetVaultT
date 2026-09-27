@@ -1,8 +1,9 @@
+import { asyncHandler } from './async.middleware.js';
 import { Request, Response, NextFunction } from 'express';
 import { query, queryOne } from '../db/index.js';
 import { comparePassword } from '../services/password.service.js';
 
-export interface AuthRequest extends Request {
+export interface AuthRequest extends Request<Record<string, string>> {
   user?: {
     id: string;
     username: string;
@@ -14,20 +15,20 @@ export interface AuthRequest extends Request {
   };
 }
 
-export async function requireAuth(req: AuthRequest, res: Response, next: NextFunction) {
+export const requireAuth = asyncHandler(async (req: AuthRequest, res: Response, next: NextFunction) => {
   const userId = (req.session as any)?.userId;
   if (!userId) {
     return res.status(401).json({ success: false, message: 'Unauthenticated. Session expired or missing.' });
   }
 
-  const user = queryOne<{
+  const user = await queryOne<{
     id: string;
     username: string;
     email: string;
     first_name: string;
     last_name: string;
     status: string;
-  }>('SELECT id, username, email, first_name, last_name, status FROM users WHERE id = ?', [userId]);
+  }>('SELECT id, username, email, first_name, last_name, status FROM users WHERE id = $1', [userId]);
 
   if (!user || user.status !== 'ACTIVE') {
     (req.session as any).destroy(() => {});
@@ -35,12 +36,12 @@ export async function requireAuth(req: AuthRequest, res: Response, next: NextFun
   }
 
   // Fetch permissions
-  const permsRows = query<{ code: string }>(
+  const permsRows = await query<{ code: string }>(
     `SELECT DISTINCT p.code
      FROM permissions p
      JOIN role_permissions rp ON p.id = rp.permission_id
      JOIN user_roles ur ON rp.role_id = ur.role_id
-     WHERE ur.user_id = ?`,
+     WHERE ur.user_id = $1`,
     [userId]
   );
 
@@ -50,7 +51,7 @@ export async function requireAuth(req: AuthRequest, res: Response, next: NextFun
   };
 
   next();
-}
+});
 
 export function requirePermission(permissionCode: string) {
   return (req: AuthRequest, res: Response, next: NextFunction) => {
@@ -69,9 +70,9 @@ export function requirePermission(permissionCode: string) {
   };
 }
 
-export async function requireReAuthIfConfigured(req: AuthRequest, res: Response, next: NextFunction) {
-  const setting = queryOne<{ setting_value: string }>(
-    'SELECT setting_value FROM system_settings WHERE setting_key = ?',
+export const requireReAuthIfConfigured = asyncHandler(async (req: AuthRequest, res: Response, next: NextFunction) => {
+  const setting = await queryOne<{ setting_value: string }>(
+    'SELECT setting_value FROM system_settings WHERE setting_key = $1',
     ['require_reauth_reveal']
   );
 
@@ -87,7 +88,7 @@ export async function requireReAuthIfConfigured(req: AuthRequest, res: Response,
       });
     }
 
-    const userDb = queryOne<{ password_hash: string }>('SELECT password_hash FROM users WHERE id = ?', [req.user!.id]);
+    const userDb = await queryOne<{ password_hash: string }>('SELECT password_hash FROM users WHERE id = $1', [req.user!.id]);
     if (!userDb || !(await comparePassword(reAuthPass as string, userDb.password_hash))) {
       return res.status(401).json({
         success: false,
@@ -98,5 +99,5 @@ export async function requireReAuthIfConfigured(req: AuthRequest, res: Response,
   }
 
   next();
-}
+});
 

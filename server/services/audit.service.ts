@@ -1,4 +1,4 @@
-import { execute } from '../db/index.js';
+import { execute, databaseErrorCode } from '../db/index.js';
 import crypto from 'crypto';
 
 export interface AuditParams {
@@ -14,18 +14,18 @@ export interface AuditParams {
   metadata?: Record<string, any> | null;
 }
 
-export function logAudit(params: AuditParams): void {
+export async function logAudit(params: AuditParams): Promise<void> {
   try {
     const id = crypto.randomUUID();
     const createdAt = new Date().toISOString();
     const metadataStr = params.metadata ? JSON.stringify(params.metadata) : null;
 
-    execute(
+    await execute(
       `INSERT INTO audit_logs (
         id, user_id, username_snapshot, action, resource_type,
         resource_id, resource_name, device_id, ip_address, user_agent,
         metadata, created_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
       [
         id,
         params.userId || null,
@@ -42,7 +42,8 @@ export function logAudit(params: AuditParams): void {
       ]
     );
   } catch (error) {
-    console.error('Failed to record audit log:', error);
+    console.error('Failed to record audit log:', databaseErrorCode(error));
+    throw error;
   }
 }
 

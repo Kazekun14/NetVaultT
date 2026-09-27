@@ -1,12 +1,7 @@
-import { describe, it, expect, beforeAll } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { encryptSecret, decryptSecret, getMasterKey } from '../server/services/encryption.service.js';
 
 describe('AES-256-GCM Encryption Service', () => {
-  beforeAll(() => {
-    // Ensure test master key is present
-    process.env.NETVAULT_MASTER_KEY = '4a8f9c1e2b3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f';
-  });
-
   it('should validate and extract a 32-byte master key from environment', () => {
     const key = getMasterKey();
     expect(key).toBeInstanceOf(Buffer);

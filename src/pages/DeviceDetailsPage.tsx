@@ -139,9 +139,9 @@ export const DeviceDetailsPage: React.FC = () => {
     <div className="space-y-8">
       {/* Top Breadcrumb Header */}
       <div className="flex items-center justify-between">
-        <Link to="/devices" className="inline-flex items-center gap-2 text-xs font-medium text-slate-400 hover:text-white transition-colors">
-          <ArrowLeft className="w-4 h-4" />
-          Back to Devices
+        <Link to="/devices" className="inline-flex items-center gap-2 text-sm font-semibold text-slate-300 hover:text-white transition-colors">
+          <ArrowLeft className="w-5 h-5 text-cyan-400 shrink-0" />
+          <span>Back</span>
         </Link>
 
         {hasPermission('devices.update') && (

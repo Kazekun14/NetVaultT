@@ -1,3 +1,4 @@
+import { asyncHandler } from '../middleware/async.middleware.js';
 import { Router } from 'express';
 import { query, queryOne, execute, transaction } from '../db/index.js';
 import { requireAuth, requirePermission, AuthRequest } from '../middleware/auth.middleware.js';
@@ -5,8 +6,8 @@ import { logAudit } from '../services/audit.service.js';
 
 const router = Router();
 
-router.get('/', requireAuth, (req, res) => {
-  const settingsRows = query<{ setting_key: string; setting_value: string; setting_type: string }>('SELECT * FROM system_settings');
+router.get('/', requireAuth, asyncHandler(async (req, res) => {
+  const settingsRows = await query<{ setting_key: string; setting_value: string; setting_type: string }>('SELECT * FROM system_settings');
 
   const settings: Record<string, any> = {};
   for (const row of settingsRows) {
@@ -20,9 +21,9 @@ router.get('/', requireAuth, (req, res) => {
   }
 
   res.json({ success: true, settings });
-});
+}));
 
-router.patch('/', requireAuth, requirePermission('settings.manage'), (req: AuthRequest, res) => {
+router.patch('/', requireAuth, requirePermission('settings.manage'), asyncHandler(async (req: AuthRequest, res) => {
   const updates: Record<string, any> = req.body;
 
   const allowedKeys = [
@@ -41,13 +42,13 @@ router.patch('/', requireAuth, requirePermission('settings.manage'), (req: AuthR
 
   const now = new Date().toISOString();
 
-  transaction(() => {
+  await transaction(async () => {
     for (const [key, value] of Object.entries(updates)) {
       if (allowedKeys.includes(key) && value !== undefined) {
         const valStr = String(value);
-        const existing = queryOne('SELECT id FROM system_settings WHERE setting_key = ?', [key]);
+        const existing = await queryOne('SELECT id FROM system_settings WHERE setting_key = $1', [key]);
         if (existing) {
-          execute('UPDATE system_settings SET setting_value = ?, updated_by = ?, updated_at = ? WHERE setting_key = ?', [
+          await execute('UPDATE system_settings SET setting_value = $1, updated_by = $2, updated_at = $3 WHERE setting_key = $4', [
             valStr,
             req.user!.id,
             now,
@@ -58,7 +59,7 @@ router.patch('/', requireAuth, requirePermission('settings.manage'), (req: AuthR
     }
   });
 
-  logAudit({
+  await logAudit({
     userId: req.user!.id,
     usernameSnapshot: req.user!.username,
     action: 'SETTINGS_CHANGED',
@@ -69,7 +70,7 @@ router.patch('/', requireAuth, requirePermission('settings.manage'), (req: AuthR
   });
 
   res.json({ success: true, message: 'System settings updated successfully.' });
-});
+}));
 
 export default router;
 

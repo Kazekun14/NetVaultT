@@ -4,7 +4,7 @@ import { AuthProvider, useAuth } from './context/AuthContext.js';
 import { ToastProvider } from './components/common/Toast.js';
 import { AppLayout } from './components/layout/AppLayout.js';
 
-import { LoginPage } from './pages/LoginPage.js';
+import { SignInPage } from './pages/SignInPage.js';
 import { DashboardPage } from './pages/DashboardPage.js';
 import { DevicesPage } from './pages/DevicesPage.js';
 import { DeviceDetailsPage } from './pages/DeviceDetailsPage.js';
@@ -30,7 +30,7 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode; perm?: string }> = (
   }
 
   if (!user) {
-    return <Navigate to="/login" replace />;
+    return <Navigate to="/signin" replace />;
   }
 
   if (perm && !hasPermission(perm)) {
@@ -51,7 +51,7 @@ export function App() {
       <AuthProvider>
         <ToastProvider>
           <Routes>
-            <Route path="/login" element={<LoginPage />} />
+            <Route path="/signin" element={<SignInPage />} />
 
             <Route
               path="/"

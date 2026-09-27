@@ -8,6 +8,7 @@ import path from 'path';
 import fs from 'fs';
 
 import { getMasterKey } from './services/encryption.service.js';
+import { databaseErrorCode } from './db/index.js';
 import { seedDatabase } from './db/seed.js';
 
 import authRoutes from './routes/auth.routes.js';
@@ -32,12 +33,12 @@ try {
 }
 
 const app = express();
-const PORT = process.env.PORT || 5000;
+const PORT = parseInt(process.env.PORT || '5000', 10);
 
 // Security Middlewares
 app.use(
   helmet({
-    contentSecurityPolicy: false, // Disabled for dev flexibility with inline scripts/vite
+    contentSecurityPolicy: false,
     crossOriginEmbedderPolicy: false,
   })
 );
@@ -89,9 +90,9 @@ if (fs.existsSync(distPath)) {
   });
 }
 
-// Global Centralized Error Handler (No sensitive leak)
+// Global Centralized Error Handler
 app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
-  console.error('Unhandled Server Error:', err.message);
+  console.error('Unhandled Server Error:', databaseErrorCode(err));
   res.status(500).json({
     success: false,
     message: 'An internal server error occurred.',
@@ -101,14 +102,18 @@ app.use((err: any, req: express.Request, res: express.Response, next: express.Ne
 // Seed DB & Start Server
 seedDatabase()
   .then(() => {
-    app.listen(PORT, () => {
-      console.log(`🚀 NetVaultT Server running on http://localhost:${PORT}`);
+    const server = app.listen(PORT, '0.0.0.0', () => {
+      console.log(`🚀 NetVaultT Server running on http://0.0.0.0:${PORT}`);
     });
+    const shutdown = () => {
+      server.close();
+    };
+    process.once('SIGINT', shutdown);
+    process.once('SIGTERM', shutdown);
   })
   .catch((err) => {
-    console.error('Failed to initialize database seed on startup:', err);
+    console.error('Database startup initialization failed:', err);
     process.exit(1);
   });
 
 export default app;
-

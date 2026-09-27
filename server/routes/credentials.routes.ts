@@ -1,5 +1,6 @@
+import { asyncHandler } from '../middleware/async.middleware.js';
 import { Router } from 'express';
-import { query, queryOne, execute } from '../db/index.js';
+import { query, queryOne, execute, databaseErrorCode } from '../db/index.js';
 import { requireAuth, requirePermission, requireReAuthIfConfigured, AuthRequest } from '../middleware/auth.middleware.js';
 import { revealLimiter } from '../middleware/rateLimit.middleware.js';
 import { encryptSecret, decryptSecret } from '../services/encryption.service.js';
@@ -27,7 +28,7 @@ function getPasswordAgeDays(changedAtStr: string): number {
 }
 
 // Global Credentials List (No Passwords)
-router.get('/', requireAuth, requirePermission('credentials.view'), (req: AuthRequest, res) => {
+router.get('/', requireAuth, requirePermission('credentials.view'), asyncHandler(async (req: AuthRequest, res) => {
   const { siteId, deviceTypeId, protocol, privilege, rotationStatus, status, search, page = '1', limit = '10' } = req.query;
 
   const pageNum = Math.max(1, parseInt(page as string, 10) || 1);
@@ -38,39 +39,39 @@ router.get('/', requireAuth, requirePermission('credentials.view'), (req: AuthRe
   const params: any[] = [];
 
   if (siteId) {
-    whereClauses.push('d.site_id = ?');
+    whereClauses.push(`d.site_id = $${params.length + 1}`);
     params.push(siteId);
   }
 
   if (deviceTypeId) {
-    whereClauses.push('d.device_type_id = ?');
+    whereClauses.push(`d.device_type_id = $${params.length + 1}`);
     params.push(deviceTypeId);
   }
 
   if (protocol) {
-    whereClauses.push('c.protocol = ?');
+    whereClauses.push(`c.protocol = $${params.length + 1}`);
     params.push(protocol);
   }
 
   if (privilege) {
-    whereClauses.push('c.privilege_level = ?');
+    whereClauses.push(`c.privilege_level = $${params.length + 1}`);
     params.push(privilege);
   }
 
   if (status) {
-    whereClauses.push('c.status = ?');
+    whereClauses.push(`c.status = $${params.length + 1}`);
     params.push(status);
   }
 
   if (search) {
-    whereClauses.push('(c.credential_name LIKE ? OR c.username LIKE ? OR d.device_name LIKE ? OR d.management_ip LIKE ?)');
+    whereClauses.push(`(c.credential_name ILIKE $${params.length + 1} OR c.username ILIKE $${params.length + 2} OR d.device_name ILIKE $${params.length + 3} OR d.management_ip ILIKE $${params.length + 4})`);
     const term = `%${search}%`;
     params.push(term, term, term, term);
   }
 
   const whereSql = whereClauses.join(' AND ');
 
-  const items = query(
+  const items = await query(
     `SELECT c.id, c.device_id, c.credential_name, c.username, c.protocol, c.port, c.login_url,
             c.privilege_level, c.description, c.password_changed_at, c.rotation_interval_days,
             c.next_rotation_at, c.status, c.created_at, c.updated_at,
@@ -110,18 +111,18 @@ router.get('/', requireAuth, requirePermission('credentials.view'), (req: AuthRe
       totalPages: Math.ceil(total / limitNum),
     },
   });
-});
+}));
 
 // Credentials for a specific device
-router.get('/device/:deviceId', requireAuth, requirePermission('credentials.view'), (req: AuthRequest, res) => {
+router.get('/device/:deviceId', requireAuth, requirePermission('credentials.view'), asyncHandler(async (req: AuthRequest, res) => {
   const { deviceId } = req.params;
 
-  const credentials = query(
+  const credentials = await query(
     `SELECT id, device_id, credential_name, username, protocol, port, login_url, privilege_level,
             description, password_changed_at, rotation_interval_days, next_rotation_at, status,
             created_at, updated_at
      FROM credentials
-     WHERE device_id = ?
+     WHERE device_id = $1
      ORDER BY credential_name ASC`,
     [deviceId]
   );
@@ -134,10 +135,10 @@ router.get('/device/:deviceId', requireAuth, requirePermission('credentials.view
   }));
 
   res.json({ success: true, credentials: formatted });
-});
+}));
 
 // Create Credential
-router.post('/device/:deviceId', requireAuth, requirePermission('credentials.create'), (req: AuthRequest, res) => {
+router.post('/device/:deviceId', requireAuth, requirePermission('credentials.create'), asyncHandler(async (req: AuthRequest, res) => {
   const { deviceId } = req.params;
   const {
     credential_name,
@@ -152,7 +153,7 @@ router.post('/device/:deviceId', requireAuth, requirePermission('credentials.cre
     description,
   } = req.body;
 
-  const device = queryOne<{ id: string; device_name: string }>('SELECT id, device_name FROM devices WHERE id = ?', [deviceId]);
+  const device = await queryOne<{ id: string; device_name: string }>('SELECT id, device_name FROM devices WHERE id = $1', [deviceId]);
   if (!device) {
     return res.status(404).json({ success: false, message: 'Device not found.' });
   }
@@ -180,12 +181,12 @@ router.post('/device/:deviceId', requireAuth, requirePermission('credentials.cre
   const nextRotDate = new Date(now.getTime() + rotInterval * 86400000).toISOString();
   const id = crypto.randomUUID();
 
-  execute(
+  await execute(
     `INSERT INTO credentials (
       id, device_id, credential_name, username, encrypted_password, encryption_iv, authentication_tag,
       encryption_version, protocol, port, login_url, privilege_level, description, password_changed_at,
       rotation_interval_days, next_rotation_at, status, created_by, updated_by, created_at, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21)`,
     [
       id,
       deviceId,
@@ -211,7 +212,7 @@ router.post('/device/:deviceId', requireAuth, requirePermission('credentials.cre
     ]
   );
 
-  logAudit({
+  await logAudit({
     userId: req.user!.id,
     usernameSnapshot: req.user!.username,
     action: 'CREDENTIAL_CREATED',
@@ -224,13 +225,13 @@ router.post('/device/:deviceId', requireAuth, requirePermission('credentials.cre
   });
 
   res.status(201).json({ success: true, message: 'Credential added successfully.', credentialId: id });
-});
+}));
 
 // Update Credential Metadata (No password change)
-router.patch('/:id', requireAuth, requirePermission('credentials.update'), (req: AuthRequest, res) => {
+router.patch('/:id', requireAuth, requirePermission('credentials.update'), asyncHandler(async (req: AuthRequest, res) => {
   const { id } = req.params;
-  const existing = queryOne<{ id: string; device_id: string; credential_name: string; password_changed_at: string }>(
-    'SELECT id, device_id, credential_name, password_changed_at FROM credentials WHERE id = ?',
+  const existing = await queryOne<{ id: string; device_id: string; credential_name: string; password_changed_at: string }>(
+    'SELECT id, device_id, credential_name, password_changed_at FROM credentials WHERE id = $1',
     [id]
   );
 
@@ -243,31 +244,31 @@ router.patch('/:id', requireAuth, requirePermission('credentials.update'), (req:
 
   const nowStr = new Date().toISOString();
 
-  let nextRotDateSql = 'next_rotation_at';
+  let nextRotDate: string | null = null;
   let rotDays = rotation_interval_days;
 
   if (rotation_interval_days) {
     const rotInterval = Math.max(1, parseInt(rotation_interval_days as any, 10) || 90);
     const lastChanged = new Date(existing.password_changed_at).getTime();
-    nextRotDateSql = `'${new Date(lastChanged + rotInterval * 86400000).toISOString()}'`;
+    nextRotDate = new Date(lastChanged + rotInterval * 86400000).toISOString();
     rotDays = rotInterval;
   }
 
-  execute(
+  await execute(
     `UPDATE credentials SET
-      credential_name = COALESCE(?, credential_name),
-      username = COALESCE(?, username),
-      protocol = COALESCE(?, protocol),
-      port = COALESCE(?, port),
-      login_url = COALESCE(?, login_url),
-      privilege_level = COALESCE(?, privilege_level),
-      rotation_interval_days = COALESCE(?, rotation_interval_days),
-      next_rotation_at = ${nextRotDateSql},
-      description = COALESCE(?, description),
-      status = COALESCE(?, status),
-      updated_by = ?,
-      updated_at = ?
-     WHERE id = ?`,
+      credential_name = COALESCE($1, credential_name),
+      username = COALESCE($2, username),
+      protocol = COALESCE($3, protocol),
+      port = COALESCE($4, port),
+      login_url = COALESCE($5, login_url),
+      privilege_level = COALESCE($6, privilege_level),
+      rotation_interval_days = COALESCE($7, rotation_interval_days),
+      next_rotation_at = COALESCE($8, next_rotation_at),
+      description = COALESCE($9, description),
+      status = COALESCE($10, status),
+      updated_by = $11,
+      updated_at = $12
+     WHERE id = $13`,
     [
       credential_name?.trim() || null,
       username?.trim() || null,
@@ -276,6 +277,7 @@ router.patch('/:id', requireAuth, requirePermission('credentials.update'), (req:
       login_url || null,
       privilege_level || null,
       rotDays || null,
+      nextRotDate,
       description !== undefined ? description : null,
       status || null,
       req.user!.id,
@@ -284,7 +286,7 @@ router.patch('/:id', requireAuth, requirePermission('credentials.update'), (req:
     ]
   );
 
-  logAudit({
+  await logAudit({
     userId: req.user!.id,
     usernameSnapshot: req.user!.username,
     action: 'CREDENTIAL_UPDATED',
@@ -297,15 +299,15 @@ router.patch('/:id', requireAuth, requirePermission('credentials.update'), (req:
   });
 
   res.json({ success: true, message: 'Credential metadata updated successfully.' });
-});
+}));
 
 // Change Password
-router.post('/:id/change-password', requireAuth, requirePermission('credentials.update'), (req: AuthRequest, res) => {
+router.post('/:id/change-password', requireAuth, requirePermission('credentials.update'), asyncHandler(async (req: AuthRequest, res) => {
   const { id } = req.params;
   const { newPassword, confirmNewPassword } = req.body;
 
-  const existing = queryOne<{ id: string; device_id: string; credential_name: string; rotation_interval_days: number }>(
-    'SELECT id, device_id, credential_name, rotation_interval_days FROM credentials WHERE id = ?',
+  const existing = await queryOne<{ id: string; device_id: string; credential_name: string; rotation_interval_days: number }>(
+    'SELECT id, device_id, credential_name, rotation_interval_days FROM credentials WHERE id = $1',
     [id]
   );
 
@@ -327,17 +329,17 @@ router.post('/:id/change-password', requireAuth, requirePermission('credentials.
 
   const nextRotDate = new Date(now.getTime() + existing.rotation_interval_days * 86400000).toISOString();
 
-  execute(
+  await execute(
     `UPDATE credentials SET
-      encrypted_password = ?,
-      encryption_iv = ?,
-      authentication_tag = ?,
-      encryption_version = ?,
-      password_changed_at = ?,
-      next_rotation_at = ?,
-      updated_by = ?,
-      updated_at = ?
-     WHERE id = ?`,
+      encrypted_password = $1,
+      encryption_iv = $2,
+      authentication_tag = $3,
+      encryption_version = $4,
+      password_changed_at = $5,
+      next_rotation_at = $6,
+      updated_by = $7,
+      updated_at = $8
+     WHERE id = $9`,
     [
       encrypted.ciphertext,
       encrypted.iv,
@@ -351,7 +353,7 @@ router.post('/:id/change-password', requireAuth, requirePermission('credentials.
     ]
   );
 
-  logAudit({
+  await logAudit({
     userId: req.user!.id,
     usernameSnapshot: req.user!.username,
     action: 'CREDENTIAL_PASSWORD_CHANGED',
@@ -364,7 +366,7 @@ router.post('/:id/change-password', requireAuth, requirePermission('credentials.
   });
 
   res.json({ success: true, message: 'Credential password updated successfully.' });
-});
+}));
 
 // Reveal Password Endpoint
 router.post(
@@ -373,10 +375,10 @@ router.post(
   requirePermission('credentials.reveal'),
   requireReAuthIfConfigured,
   revealLimiter,
-  (req: AuthRequest, res) => {
+  asyncHandler(async (req: AuthRequest, res) => {
     const { id } = req.params;
 
-    const cred = queryOne<{
+    const cred = await queryOne<{
       id: string;
       device_id: string;
       credential_name: string;
@@ -389,7 +391,7 @@ router.post(
       `SELECT c.*, d.device_name
        FROM credentials c
        JOIN devices d ON c.device_id = d.id
-       WHERE c.id = ?`,
+       WHERE c.id = $1`,
       [id]
     );
 
@@ -400,7 +402,7 @@ router.post(
     try {
       const plaintextPassword = decryptSecret(cred.encrypted_password, cred.encryption_iv, cred.authentication_tag);
 
-      logAudit({
+      await logAudit({
         userId: req.user!.id,
         usernameSnapshot: req.user!.username,
         action: 'CREDENTIAL_REVEALED',
@@ -413,8 +415,8 @@ router.post(
       });
 
       // Get reveal timeout setting from DB
-      const revealTimeoutSetting = queryOne<{ setting_value: string }>(
-        'SELECT setting_value FROM system_settings WHERE setting_key = ?',
+      const revealTimeoutSetting = await queryOne<{ setting_value: string }>(
+        'SELECT setting_value FROM system_settings WHERE setting_key = $1',
         ['reveal_timeout']
       );
 
@@ -426,10 +428,10 @@ router.post(
         autoHideSeconds: revealTimeoutSeconds,
       });
     } catch (err: any) {
-      console.error('Decryption failure for credential ID:', id, err);
+      console.error('Decryption failure for credential ID:', id, databaseErrorCode(err));
       res.status(500).json({ success: false, message: 'Failed to decrypt credential securely.' });
     }
-  }
+  })
 );
 
 // Copy Password Endpoint
@@ -438,10 +440,10 @@ router.post(
   requireAuth,
   requirePermission('credentials.copy'),
   revealLimiter,
-  (req: AuthRequest, res) => {
+  asyncHandler(async (req: AuthRequest, res) => {
     const { id } = req.params;
 
-    const cred = queryOne<{
+    const cred = await queryOne<{
       id: string;
       device_id: string;
       credential_name: string;
@@ -452,7 +454,7 @@ router.post(
     }>(
       `SELECT c.*
        FROM credentials c
-       WHERE c.id = ?`,
+       WHERE c.id = $1`,
       [id]
     );
 
@@ -463,7 +465,7 @@ router.post(
     try {
       const plaintextPassword = decryptSecret(cred.encrypted_password, cred.encryption_iv, cred.authentication_tag);
 
-      logAudit({
+      await logAudit({
         userId: req.user!.id,
         usernameSnapshot: req.user!.username,
         action: 'CREDENTIAL_COPIED',
@@ -480,17 +482,17 @@ router.post(
         password: plaintextPassword,
       });
     } catch (err: any) {
-      console.error('Decryption failure during copy:', id, err);
+      console.error('Decryption failure during copy:', id, databaseErrorCode(err));
       res.status(500).json({ success: false, message: 'Failed to decrypt credential securely.' });
     }
-  }
+  })
 );
 
 // Disable Credential
-router.post('/:id/disable', requireAuth, requirePermission('credentials.disable'), (req: AuthRequest, res) => {
+router.post('/:id/disable', requireAuth, requirePermission('credentials.disable'), asyncHandler(async (req: AuthRequest, res) => {
   const { id } = req.params;
-  const existing = queryOne<{ id: string; device_id: string; credential_name: string }>(
-    'SELECT id, device_id, credential_name FROM credentials WHERE id = ?',
+  const existing = await queryOne<{ id: string; device_id: string; credential_name: string }>(
+    'SELECT id, device_id, credential_name FROM credentials WHERE id = $1',
     [id]
   );
 
@@ -499,9 +501,9 @@ router.post('/:id/disable', requireAuth, requirePermission('credentials.disable'
   }
 
   const nowStr = new Date().toISOString();
-  execute('UPDATE credentials SET status = ?, updated_by = ?, updated_at = ? WHERE id = ?', ['DISABLED', req.user!.id, nowStr, id]);
+  await execute('UPDATE credentials SET status = $1, updated_by = $2, updated_at = $3 WHERE id = $4', ['DISABLED', req.user!.id, nowStr, id]);
 
-  logAudit({
+  await logAudit({
     userId: req.user!.id,
     usernameSnapshot: req.user!.username,
     action: 'CREDENTIAL_DISABLED',
@@ -514,7 +516,7 @@ router.post('/:id/disable', requireAuth, requirePermission('credentials.disable'
   });
 
   res.json({ success: true, message: 'Credential disabled successfully.' });
-});
+}));
 
 export default router;
 
