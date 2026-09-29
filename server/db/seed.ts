@@ -127,7 +127,7 @@ export async function seedDatabase() {
 
     // 3. Seed Default Super Admin User
     const superAdminRole = await queryOne<{ id: string }>('SELECT id FROM roles WHERE name = $1', ['Super Administrator']);
-    const existingAdmin = await queryOne<{ id: string }>('SELECT id FROM users WHERE username = $1', ['admin']);
+    const existingAdmin = await queryOne<{ id: string }>('SELECT id FROM users WHERE username = $1 OR username = $2', ['superadmin', 'admin']);
 
     let adminUserId = existingAdmin?.id;
     if (!existingAdmin) {
@@ -137,7 +137,7 @@ export async function seedDatabase() {
         `INSERT INTO users (
           id, first_name, last_name, username, email, password_hash, status, created_at, updated_at
         ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
-        [adminUserId, 'System', 'Administrator', 'admin', 'admin@netvaultt.internal', adminPasswordHash, 'ACTIVE', now, now]
+        [adminUserId, 'System', 'Administrator', 'superadmin', 'superadmin@netvaultt.internal', adminPasswordHash, 'ACTIVE', now, now]
       );
 
       if (superAdminRole) {
@@ -174,243 +174,7 @@ export async function seedDatabase() {
       }
     }
 
-    // 5. Seed Sites
-    const sitesList = [
-      { code: 'HQ', name: 'Main Office', description: 'Headquarters Data Center', address: '123 Tech Park Ave', contact_person: 'John Doe', contact_number: '+63 917 123 4567' },
-      { code: 'SGY', name: 'SGY Substation', description: 'SGY Regional Distribution Site', address: 'SGY Facility, Highway 45', contact_person: 'Maria Santos', contact_number: '+63 918 234 5678' },
-      { code: 'CLP', name: 'CLP Data Hub', description: 'CLP Central Switching Hub', address: 'CLP Telecom Bldg', contact_person: 'Alex Reyes', contact_number: '+63 919 345 6789' },
-    ];
-
-    for (const site of sitesList) {
-      const existing = await queryOne('SELECT id FROM sites WHERE code = $1', [site.code]);
-      if (!existing) {
-        await execute(
-          `INSERT INTO sites (id, code, name, description, address, contact_person, contact_number, status, notes, created_at, updated_at)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
-          [crypto.randomUUID(), site.code, site.name, site.description, site.address, site.contact_person, site.contact_number, 'ACTIVE', 'Primary POP', now, now]
-        );
-      }
-    }
-
-    // 6. Seed Sample Devices & Credentials
-    const hqSite = await queryOne<{ id: string }>('SELECT id FROM sites WHERE code = $1', ['HQ']);
-    const sgySite = await queryOne<{ id: string }>('SELECT id FROM sites WHERE code = $1', ['SGY']);
-    const mikrotikType = await queryOne<{ id: string }>('SELECT id FROM device_types WHERE code = $1', ['MIKROTIK']);
-    const oltType = await queryOne<{ id: string }>('SELECT id FROM device_types WHERE code = $1', ['OLT']);
-    const iptvType = await queryOne<{ id: string }>('SELECT id FROM device_types WHERE code = $1', ['IPTV_SERVER']);
-
-    if (hqSite && mikrotikType) {
-      let coreRtr = await queryOne<{ id: string }>('SELECT id FROM devices WHERE device_name = $1', ['CORE-RTR']);
-      let coreRtrId = coreRtr?.id;
-
-      if (!coreRtrId) {
-        coreRtrId = crypto.randomUUID();
-        await execute(
-          `INSERT INTO devices (
-            id, device_name, device_type_id, site_id, vendor, model, management_ip, hostname,
-            management_vlan, ssh_port, http_port, https_port, description, status, created_by, updated_by, created_at, updated_at
-          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)`,
-          [
-            coreRtrId,
-            'CORE-RTR',
-            mikrotikType.id,
-            hqSite.id,
-            'MikroTik',
-            'CCR2004-16G-2S+',
-            '192.168.1.1',
-            'core-rtr.hq.internal',
-            10,
-            22,
-            80,
-            443,
-            'Main HQ Edge Router',
-            'ACTIVE',
-            adminUserId,
-            adminUserId,
-            now,
-            now,
-          ]
-        );
-
-        // Add credential
-        const encrypted = encryptSecret('SuperSecretMikrotikPass123!');
-        const changedAt = new Date().toISOString();
-        const nextRot = new Date(Date.now() + 90 * 86400000).toISOString();
-
-        await execute(
-          `INSERT INTO credentials (
-            id, device_id, credential_name, username, encrypted_password, encryption_iv, authentication_tag,
-            encryption_version, protocol, port, login_url, privilege_level, description, password_changed_at,
-            rotation_interval_days, next_rotation_at, status, created_by, updated_by, created_at, updated_at
-          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21)`,
-          [
-            crypto.randomUUID(),
-            coreRtrId,
-            'Web Admin',
-            'admin',
-            encrypted.ciphertext,
-            encrypted.iv,
-            encrypted.authTag,
-            encrypted.version,
-            'HTTPS',
-            443,
-            'https://192.168.1.1',
-            'ADMIN',
-            'Primary Web Admin User',
-            changedAt,
-            90,
-            nextRot,
-            'ACTIVE',
-            adminUserId,
-            adminUserId,
-            now,
-            now,
-          ]
-        );
-      }
-    }
-
-    if (sgySite && oltType) {
-      let sgyOlt = await queryOne<{ id: string }>('SELECT id FROM devices WHERE device_name = $1', ['SGY-OLT1']);
-      let sgyOltId = sgyOlt?.id;
-
-      if (!sgyOltId) {
-        sgyOltId = crypto.randomUUID();
-        await execute(
-          `INSERT INTO devices (
-            id, device_name, device_type_id, site_id, vendor, model, management_ip, hostname,
-            management_vlan, ssh_port, http_port, https_port, description, status, created_by, updated_by, created_at, updated_at
-          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)`,
-          [
-            sgyOltId,
-            'SGY-OLT1',
-            oltType.id,
-            sgySite.id,
-            'Huawei',
-            'MA5608T',
-            '192.168.100.20',
-            'sgy-olt1.sgy.internal',
-            100,
-            22,
-            80,
-            443,
-            'SGY Substation OLT',
-            'ACTIVE',
-            adminUserId,
-            adminUserId,
-            now,
-            now,
-          ]
-        );
-
-        const encrypted = encryptSecret('OltSecurePassword2026!');
-        const changedAt = new Date(Date.now() - 85 * 86400000).toISOString(); // 85 days ago -> Due soon!
-        const nextRot = new Date(Date.now() + 5 * 86400000).toISOString();
-
-        await execute(
-          `INSERT INTO credentials (
-            id, device_id, credential_name, username, encrypted_password, encryption_iv, authentication_tag,
-            encryption_version, protocol, port, login_url, privilege_level, description, password_changed_at,
-            rotation_interval_days, next_rotation_at, status, created_by, updated_by, created_at, updated_at
-          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21)`,
-          [
-            crypto.randomUUID(),
-            sgyOltId,
-            'CLI Admin',
-            'root',
-            encrypted.ciphertext,
-            encrypted.iv,
-            encrypted.authTag,
-            encrypted.version,
-            'SSH',
-            22,
-            null,
-            'ADMIN',
-            'SSH Root Access',
-            changedAt,
-            90,
-            nextRot,
-            'ACTIVE',
-            adminUserId,
-            adminUserId,
-            now,
-            now,
-          ]
-        );
-      }
-    }
-
-    if (hqSite && iptvType) {
-      let iptvServer = await queryOne<{ id: string }>('SELECT id FROM devices WHERE device_name = $1', ['IPTV-SERVER']);
-      let iptvServerId = iptvServer?.id;
-
-      if (!iptvServerId) {
-        iptvServerId = crypto.randomUUID();
-        await execute(
-          `INSERT INTO devices (
-            id, device_name, device_type_id, site_id, vendor, model, management_ip, hostname,
-            management_vlan, ssh_port, http_port, https_port, description, status, created_by, updated_by, created_at, updated_at
-          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)`,
-          [
-            iptvServerId,
-            'IPTV-SERVER',
-            iptvType.id,
-            hqSite.id,
-            'Dell',
-            'PowerEdge R640',
-            '192.168.1.44',
-            'iptv.hq.internal',
-            20,
-            22,
-            80,
-            443,
-            'HQ IPTV Streaming Node',
-            'ACTIVE',
-            adminUserId,
-            adminUserId,
-            now,
-            now,
-          ]
-        );
-
-        const encrypted = encryptSecret('IptvServerPassword99!');
-        const changedAt = new Date().toISOString();
-        const nextRot = new Date(Date.now() + 90 * 86400000).toISOString();
-
-        await execute(
-          `INSERT INTO credentials (
-            id, device_id, credential_name, username, encrypted_password, encryption_iv, authentication_tag,
-            encryption_version, protocol, port, login_url, privilege_level, description, password_changed_at,
-            rotation_interval_days, next_rotation_at, status, created_by, updated_by, created_at, updated_at
-          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21)`,
-          [
-            crypto.randomUUID(),
-            iptvServerId,
-            'Root SSH',
-            'root',
-            encrypted.ciphertext,
-            encrypted.iv,
-            encrypted.authTag,
-            encrypted.version,
-            'SSH',
-            22,
-            null,
-            'ADMIN',
-            'System Root Access',
-            changedAt,
-            90,
-            nextRot,
-            'ACTIVE',
-            adminUserId,
-            adminUserId,
-            now,
-            now,
-          ]
-        );
-      }
-    }
-
-    // 7. Seed System Settings
+    // 5. Seed System Settings
     const defaultSettings = [
       { key: 'app_name', value: 'NetVaultT', type: 'string' },
       { key: 'organization_name', value: 'NetVaultT Enterprise Network', type: 'string' },
@@ -434,7 +198,6 @@ export async function seedDatabase() {
         );
       }
     }
-
   });
   console.log('Database seeding finished successfully.');
 }

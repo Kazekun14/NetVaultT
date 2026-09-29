@@ -3,7 +3,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import { apiFetch } from '../lib/api.js';
 import { Device, DeviceType, Site } from '../types/index.js';
 import { useToast } from '../components/common/Toast.js';
-import { ArrowLeft, Save, Router as RouterIcon } from 'lucide-react';
+import { ArrowLeft, Save, Router } from 'lucide-react';
 
 export const AddEditDevicePage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -49,17 +49,11 @@ export const AddEditDevicePage: React.FC = () => {
       const typesRes = await apiFetch<{ success: boolean; deviceTypes: DeviceType[] }>('/devices/types');
       if (typesRes.success) {
         setTypes(typesRes.deviceTypes);
-        if (!isEdit && typesRes.deviceTypes.length > 0) {
-          setFormData((prev) => ({ ...prev, device_type_id: typesRes.deviceTypes[0].id }));
-        }
       }
 
       const sitesRes = await apiFetch<{ success: boolean; sites: Site[] }>('/sites');
       if (sitesRes.success) {
         setSites(sitesRes.sites);
-        if (!isEdit && sitesRes.sites.length > 0) {
-          setFormData((prev) => ({ ...prev, site_id: sitesRes.sites[0].id }));
-        }
       }
     } catch (err) {
       console.error('Failed to load metadata:', err);
@@ -108,8 +102,8 @@ export const AddEditDevicePage: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.device_name || !formData.management_ip || !formData.device_type_id || !formData.site_id) {
-      showToast('Please fill in all required fields.', 'error');
+    if (!formData.device_name || !formData.device_name.trim()) {
+      showToast('Device name is required.', 'error');
       return;
     }
 
@@ -140,37 +134,41 @@ export const AddEditDevicePage: React.FC = () => {
   }
 
   return (
-    <div className="space-y-4 max-w-4xl mx-auto">
+    <div className="max-w-4xl mx-auto space-y-4">
+      {/* Back Link */}
       <div>
         <Link
           to="/devices"
-          className="inline-flex items-center gap-2 text-sm font-semibold text-slate-300 hover:text-white transition-colors"
+          className="inline-flex items-center gap-2 text-sm font-semibold text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white transition-colors"
         >
-          <ArrowLeft className="w-5 h-5 text-cyan-400 shrink-0" />
+          <ArrowLeft className="w-5 h-5" />
           <span>Back</span>
         </Link>
       </div>
 
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 sm:p-8 shadow-xl space-y-6">
-        <div className="flex items-center gap-3 border-b border-slate-800 pb-4">
-          <div className="w-10 h-10 rounded-xl bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 flex items-center justify-center shrink-0">
-            <RouterIcon className="w-5 h-5" />
+      {/* Device Form Card */}
+      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 sm:p-8 shadow-sm dark:shadow-xl space-y-6">
+        <div className="flex items-center gap-3 border-b border-slate-200 dark:border-slate-800 pb-4">
+          <div className="w-10 h-10 rounded-xl bg-cyan-500/10 border border-cyan-500/20 text-cyan-600 dark:text-cyan-400 flex items-center justify-center">
+            <Router className="w-5 h-5" />
           </div>
           <div>
-            <h1 className="text-xl font-bold text-white tracking-tight">
+            <h1 className="text-xl font-bold text-slate-900 dark:text-white tracking-tight">
               {isEdit ? 'Edit Network Device' : 'Add Network Device'}
             </h1>
-            <p className="text-xs text-slate-400">Enter the device details, network information, and management settings.</p>
+            <p className="text-xs text-slate-500 dark:text-slate-400">
+              Enter the device details, network information, site assignment, and access configuration.
+            </p>
           </div>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-8">
           {/* Basic Information */}
           <div className="space-y-4">
-            <h2 className="text-xs font-bold text-cyan-400 uppercase tracking-wider">Basic Information</h2>
+            <h2 className="text-xs font-bold text-cyan-600 dark:text-cyan-400 uppercase tracking-wider">Basic Information</h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-1">
-                <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Device Name *</label>
+                <label className="text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wider">Device Name *</label>
                 <input
                   type="text"
                   name="device_name"
@@ -178,19 +176,19 @@ export const AddEditDevicePage: React.FC = () => {
                   value={formData.device_name}
                   onChange={handleChange}
                   placeholder="e.g. SGY-OLT1 or CORE-RTR"
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none focus:border-cyan-500"
+                  className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2.5 text-xs text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:border-cyan-500"
                 />
               </div>
 
               <div className="space-y-1">
-                <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Device Type *</label>
+                <label className="text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wider">Device Type</label>
                 <select
                   name="device_type_id"
-                  required
                   value={formData.device_type_id}
                   onChange={handleChange}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none focus:border-cyan-500"
+                  className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2.5 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-cyan-500"
                 >
+                  <option value="">Select Device Type (Optional)</option>
                   {types.map((t) => (
                     <option key={t.id} value={t.id}>
                       {t.name}
@@ -200,14 +198,14 @@ export const AddEditDevicePage: React.FC = () => {
               </div>
 
               <div className="space-y-1">
-                <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Site *</label>
+                <label className="text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wider">Site</label>
                 <select
                   name="site_id"
-                  required
                   value={formData.site_id}
                   onChange={handleChange}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none focus:border-cyan-500"
+                  className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2.5 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-cyan-500"
                 >
+                  <option value="">Select Site (Optional)</option>
                   {sites.map((s) => (
                     <option key={s.id} value={s.id}>
                       {s.name} ({s.code})
@@ -217,12 +215,12 @@ export const AddEditDevicePage: React.FC = () => {
               </div>
 
               <div className="space-y-1">
-                <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Status *</label>
+                <label className="text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wider">Status *</label>
                 <select
                   name="status"
                   value={formData.status}
                   onChange={handleChange}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none focus:border-cyan-500"
+                  className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2.5 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-cyan-500"
                 >
                   <option value="ACTIVE">ACTIVE</option>
                   <option value="INACTIVE">INACTIVE</option>
@@ -232,26 +230,26 @@ export const AddEditDevicePage: React.FC = () => {
               </div>
 
               <div className="space-y-1">
-                <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Vendor</label>
+                <label className="text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wider">Vendor</label>
                 <input
                   type="text"
                   name="vendor"
                   value={formData.vendor}
                   onChange={handleChange}
                   placeholder="MikroTik, Huawei, Cisco, Dell..."
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none focus:border-cyan-500"
+                  className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2.5 text-xs text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:border-cyan-500"
                 />
               </div>
 
               <div className="space-y-1">
-                <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Model</label>
+                <label className="text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wider">Model</label>
                 <input
                   type="text"
                   name="model"
                   value={formData.model}
                   onChange={handleChange}
                   placeholder="CCR2004, MA5608T, PowerEdge R640..."
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none focus:border-cyan-500"
+                  className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2.5 text-xs text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:border-cyan-500"
                 />
               </div>
             </div>
@@ -259,54 +257,65 @@ export const AddEditDevicePage: React.FC = () => {
 
           {/* Network Information */}
           <div className="space-y-4">
-            <h2 className="text-xs font-bold text-cyan-400 uppercase tracking-wider">Network Information</h2>
+            <h2 className="text-xs font-bold text-cyan-600 dark:text-cyan-400 uppercase tracking-wider">Network Information</h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-1">
-                <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Management IP *</label>
+                <label className="text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wider">Management IP</label>
                 <input
                   type="text"
                   name="management_ip"
-                  required
                   value={formData.management_ip}
                   onChange={handleChange}
                   placeholder="192.168.1.1"
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-xs text-cyan-400 font-mono focus:outline-none focus:border-cyan-500"
+                  className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2.5 text-xs text-cyan-600 dark:text-cyan-400 font-mono focus:outline-none focus:border-cyan-500"
                 />
               </div>
 
               <div className="space-y-1">
-                <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Hostname</label>
+                <label className="text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wider">MAC Address</label>
+                <input
+                  type="text"
+                  name="mac_address"
+                  value={formData.mac_address}
+                  onChange={handleChange}
+                  placeholder="00:11:22:33:44:55"
+                  className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2.5 text-xs text-slate-900 dark:text-white font-mono focus:outline-none focus:border-cyan-500"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wider">Hostname</label>
                 <input
                   type="text"
                   name="hostname"
                   value={formData.hostname}
                   onChange={handleChange}
                   placeholder="core-rtr.hq.internal"
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-xs text-white font-mono focus:outline-none focus:border-cyan-500"
+                  className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2.5 text-xs text-slate-900 dark:text-white font-mono focus:outline-none focus:border-cyan-500"
                 />
               </div>
 
               <div className="space-y-1">
-                <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Management VLAN</label>
+                <label className="text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wider">Management VLAN</label>
                 <input
                   type="number"
                   name="management_vlan"
                   value={formData.management_vlan}
                   onChange={handleChange}
                   placeholder="10"
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none focus:border-cyan-500"
+                  className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2.5 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-cyan-500"
                 />
               </div>
 
               <div className="space-y-1">
-                <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Serial Number</label>
+                <label className="text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wider">Serial Number</label>
                 <input
                   type="text"
                   name="serial_number"
                   value={formData.serial_number}
                   onChange={handleChange}
                   placeholder="SN-99882211"
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-xs text-white font-mono focus:outline-none focus:border-cyan-500"
+                  className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2.5 text-xs text-slate-900 dark:text-white font-mono focus:outline-none focus:border-cyan-500"
                 />
               </div>
             </div>
@@ -314,56 +323,56 @@ export const AddEditDevicePage: React.FC = () => {
 
           {/* Access Ports */}
           <div className="space-y-4">
-            <h2 className="text-xs font-bold text-cyan-400 uppercase tracking-wider">Access Ports</h2>
+            <h2 className="text-xs font-bold text-cyan-600 dark:text-cyan-400 uppercase tracking-wider">Access Ports</h2>
             <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
               <div className="space-y-1">
-                <label className="text-[11px] font-semibold text-slate-400 uppercase">SSH Port</label>
+                <label className="text-[11px] font-semibold text-slate-600 dark:text-slate-400 uppercase">SSH Port</label>
                 <input
                   type="number"
                   name="ssh_port"
                   value={formData.ssh_port}
                   onChange={handleChange}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-cyan-400 font-mono focus:outline-none focus:border-cyan-500"
+                  className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-xs text-cyan-600 dark:text-cyan-400 font-mono focus:outline-none focus:border-cyan-500"
                 />
               </div>
               <div className="space-y-1">
-                <label className="text-[11px] font-semibold text-slate-400 uppercase">HTTP Port</label>
+                <label className="text-[11px] font-semibold text-slate-600 dark:text-slate-400 uppercase">HTTP Port</label>
                 <input
                   type="number"
                   name="http_port"
                   value={formData.http_port}
                   onChange={handleChange}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-cyan-400 font-mono focus:outline-none focus:border-cyan-500"
+                  className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-xs text-cyan-600 dark:text-cyan-400 font-mono focus:outline-none focus:border-cyan-500"
                 />
               </div>
               <div className="space-y-1">
-                <label className="text-[11px] font-semibold text-slate-400 uppercase">HTTPS Port</label>
+                <label className="text-[11px] font-semibold text-slate-600 dark:text-slate-400 uppercase">HTTPS Port</label>
                 <input
                   type="number"
                   name="https_port"
                   value={formData.https_port}
                   onChange={handleChange}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-cyan-400 font-mono focus:outline-none focus:border-cyan-500"
+                  className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-xs text-cyan-600 dark:text-cyan-400 font-mono focus:outline-none focus:border-cyan-500"
                 />
               </div>
               <div className="space-y-1">
-                <label className="text-[11px] font-semibold text-slate-400 uppercase">Telnet Port</label>
+                <label className="text-[11px] font-semibold text-slate-600 dark:text-slate-400 uppercase">Telnet Port</label>
                 <input
                   type="number"
                   name="telnet_port"
                   value={formData.telnet_port}
                   onChange={handleChange}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-cyan-400 font-mono focus:outline-none focus:border-cyan-500"
+                  className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-xs text-cyan-600 dark:text-cyan-400 font-mono focus:outline-none focus:border-cyan-500"
                 />
               </div>
               <div className="space-y-1">
-                <label className="text-[11px] font-semibold text-slate-400 uppercase">SNMP Port</label>
+                <label className="text-[11px] font-semibold text-slate-600 dark:text-slate-400 uppercase">SNMP Port</label>
                 <input
                   type="number"
                   name="snmp_port"
                   value={formData.snmp_port}
                   onChange={handleChange}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-cyan-400 font-mono focus:outline-none focus:border-cyan-500"
+                  className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-xs text-cyan-600 dark:text-cyan-400 font-mono focus:outline-none focus:border-cyan-500"
                 />
               </div>
             </div>
@@ -371,27 +380,27 @@ export const AddEditDevicePage: React.FC = () => {
 
           {/* Description & Notes */}
           <div className="space-y-4">
-            <h2 className="text-xs font-bold text-cyan-400 uppercase tracking-wider">Description & Notes</h2>
+            <h2 className="text-xs font-bold text-cyan-600 dark:text-cyan-400 uppercase tracking-wider">Description & Notes</h2>
             <div className="space-y-3">
               <div className="space-y-1">
-                <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Description</label>
+                <label className="text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wider">Description</label>
                 <textarea
                   name="description"
                   rows={2}
                   value={formData.description}
                   onChange={handleChange}
                   placeholder="Primary core router serving HQ network..."
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none focus:border-cyan-500"
+                  className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2.5 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-cyan-500"
                 />
               </div>
             </div>
           </div>
 
           {/* Submit buttons */}
-          <div className="flex justify-end gap-3 pt-4 border-t border-slate-800">
+          <div className="flex justify-end gap-3 pt-4 border-t border-slate-200 dark:border-slate-800">
             <Link
               to="/devices"
-              className="px-5 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-semibold transition-colors"
+              className="px-5 py-2.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-xl text-xs font-semibold transition-colors"
             >
               Cancel
             </Link>

@@ -57,8 +57,8 @@ router.get('/', requireAuth, requirePermission('devices.view'), asyncHandler(asy
   const countRow = await queryOne<{ count: number }>(
     `SELECT COUNT(*)::int as count
      FROM devices d
-     JOIN sites s ON d.site_id = s.id
-     JOIN device_types dt ON d.device_type_id = dt.id
+     LEFT JOIN sites s ON d.site_id = s.id
+     LEFT JOIN device_types dt ON d.device_type_id = dt.id
      WHERE ${whereSql}`,
     params
   );
@@ -79,11 +79,11 @@ router.get('/', requireAuth, requirePermission('devices.view'), asyncHandler(asy
   const sortDir = (sortOrder as string).toUpperCase() === 'DESC' ? 'DESC' : 'ASC';
 
   const items = await query(
-    `SELECT d.*, s.name as site_name, s.code as site_code, dt.name as device_type_name, dt.code as device_type_code,
+    `SELECT d.*, COALESCE(s.name, 'Unassigned') as site_name, COALESCE(s.code, 'N/A') as site_code, COALESCE(dt.name, 'Unspecified') as device_type_name, COALESCE(dt.code, 'OTHER') as device_type_code,
             (SELECT COUNT(*)::int FROM credentials c WHERE c.device_id = d.id) as credential_count
      FROM devices d
-     JOIN sites s ON d.site_id = s.id
-     JOIN device_types dt ON d.device_type_id = dt.id
+     LEFT JOIN sites s ON d.site_id = s.id
+     LEFT JOIN device_types dt ON d.device_type_id = dt.id
      WHERE ${whereSql}
      ORDER BY ${sortCol} ${sortDir}
      LIMIT $${params.length + 1} OFFSET $${params.length + 2}`,
@@ -107,10 +107,10 @@ router.get('/:id', requireAuth, requirePermission('devices.view'), asyncHandler(
   const { id } = req.params;
 
   const device = await queryOne(
-    `SELECT d.*, s.name as site_name, s.code as site_code, dt.name as device_type_name, dt.code as device_type_code
+    `SELECT d.*, COALESCE(s.name, 'Unassigned') as site_name, COALESCE(s.code, 'N/A') as site_code, COALESCE(dt.name, 'Unspecified') as device_type_name, COALESCE(dt.code, 'OTHER') as device_type_code
      FROM devices d
-     JOIN sites s ON d.site_id = s.id
-     JOIN device_types dt ON d.device_type_id = dt.id
+     LEFT JOIN sites s ON d.site_id = s.id
+     LEFT JOIN device_types dt ON d.device_type_id = dt.id
      WHERE d.id = $1`,
     [id]
   );
@@ -172,10 +172,10 @@ router.post('/', requireAuth, requirePermission('devices.create'), asyncHandler(
     status,
   } = req.body;
 
-  if (!device_name || !device_type_id || !site_id || !management_ip) {
+  if (!device_name || !device_name.trim()) {
     return res.status(400).json({
       success: false,
-      message: 'Device name, device type, site, and management IP address are required.',
+      message: 'Device name is required.',
     });
   }
 
@@ -203,11 +203,11 @@ router.post('/', requireAuth, requirePermission('devices.create'), asyncHandler(
     [
       id,
       device_name.trim(),
-      device_type_id,
-      site_id,
+      device_type_id || null,
+      site_id || null,
       vendor || null,
       model || null,
-      management_ip.trim(),
+      management_ip ? management_ip.trim() : null,
       hostname || null,
       management_vlan ? parseInt(management_vlan, 10) : null,
       mac_address || null,
@@ -253,7 +253,10 @@ router.post('/', requireAuth, requirePermission('devices.create'), asyncHandler(
 // Update Device
 router.patch('/:id', requireAuth, requirePermission('devices.update'), asyncHandler(async (req: AuthRequest, res) => {
   const { id } = req.params;
-  const existing = await queryOne<{ id: string; device_name: string }>('SELECT id, device_name FROM devices WHERE id = $1', [id]);
+  const existing = await queryOne<{ id: string; device_name: string; device_type_id: string | null; site_id: string | null; management_ip: string | null }>(
+    'SELECT id, device_name, device_type_id, site_id, management_ip FROM devices WHERE id = $1',
+    [id]
+  );
   if (!existing) {
     return res.status(404).json({ success: false, message: 'Device not found.' });
   }
@@ -287,56 +290,73 @@ router.patch('/:id', requireAuth, requirePermission('devices.update'), asyncHand
     status,
   } = req.body;
 
+  const parsePort = (val: any, defaultVal: number) => {
+    if (val === undefined || val === null || val === '') return defaultVal;
+    const num = parseInt(val, 10);
+    return isNaN(num) ? defaultVal : num;
+  };
+
+  const parseNullableInt = (val: any) => {
+    if (val === undefined || val === null || val === '') return null;
+    const num = parseInt(val, 10);
+    return isNaN(num) ? null : num;
+  };
+
+  const deviceNameVal = device_name && device_name.trim() ? device_name.trim() : existing.device_name;
+  const deviceTypeIdVal = device_type_id !== undefined ? (device_type_id ? device_type_id : null) : existing.device_type_id;
+  const siteIdVal = site_id !== undefined ? (site_id ? site_id : null) : existing.site_id;
+  const mgmtIpVal = management_ip !== undefined ? (management_ip && management_ip.trim() ? management_ip.trim() : null) : existing.management_ip;
+
   const now = new Date().toISOString();
 
   await execute(
     `UPDATE devices SET
-      device_name = COALESCE($1, device_name),
-      device_type_id = COALESCE($2, device_type_id),
-      site_id = COALESCE($3, site_id),
-      vendor = COALESCE($4, vendor),
-      model = COALESCE($5, model),
-      management_ip = COALESCE($6, management_ip),
-      hostname = COALESCE($7, hostname),
-      management_vlan = COALESCE($8, management_vlan),
-      mac_address = COALESCE($9, mac_address),
-      serial_number = COALESCE($10, serial_number),
-      asset_tag = COALESCE($11, asset_tag),
-      ssh_port = COALESCE($12, ssh_port),
-      http_port = COALESCE($13, http_port),
-      https_port = COALESCE($14, https_port),
-      telnet_port = COALESCE($15, telnet_port),
-      snmp_port = COALESCE($16, snmp_port),
-      firmware_version = COALESCE($17, firmware_version),
-      software_version = COALESCE($18, software_version),
-      rack = COALESCE($19, rack),
-      rack_unit = COALESCE($20, rack_unit),
-      physical_location = COALESCE($21, physical_location),
-      uplink = COALESCE($22, uplink),
-      parent_device = COALESCE($23, parent_device),
-      description = COALESCE($24, description),
-      notes = COALESCE($25, notes),
+      device_name = $1,
+      device_type_id = $2,
+      site_id = $3,
+      vendor = $4,
+      model = $5,
+      management_ip = $6,
+      hostname = $7,
+      management_vlan = $8,
+      mac_address = $9,
+      serial_number = $10,
+      asset_tag = $11,
+      ssh_port = $12,
+      http_port = $13,
+      https_port = $14,
+      telnet_port = $15,
+      snmp_port = $16,
+      firmware_version = $17,
+      software_version = $18,
+      rack = $19,
+      rack_unit = $20,
+      physical_location = $21,
+      uplink = $22,
+      parent_device = $23,
+      description = $24,
+      notes = $25,
       status = COALESCE($26, status),
       updated_by = $27,
       updated_at = $28
      WHERE id = $29`,
     [
-      device_name || null,
-      device_type_id || null,
-      site_id || null,
+      deviceNameVal,
+      deviceTypeIdVal,
+      siteIdVal,
       vendor || null,
       model || null,
-      management_ip || null,
+      mgmtIpVal,
       hostname || null,
-      management_vlan !== undefined ? management_vlan : null,
+      parseNullableInt(management_vlan),
       mac_address || null,
       serial_number || null,
       asset_tag || null,
-      ssh_port !== undefined ? ssh_port : null,
-      http_port !== undefined ? http_port : null,
-      https_port !== undefined ? https_port : null,
-      telnet_port !== undefined ? telnet_port : null,
-      snmp_port !== undefined ? snmp_port : null,
+      parsePort(ssh_port, 22),
+      parsePort(http_port, 80),
+      parsePort(https_port, 443),
+      parsePort(telnet_port, 23),
+      parsePort(snmp_port, 161),
       firmware_version || null,
       software_version || null,
       rack || null,

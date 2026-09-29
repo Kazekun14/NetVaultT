@@ -32,36 +32,36 @@ export const ReAuthModal: React.FC<ReAuthModalProps> = ({ isOpen, onClose, onCon
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md">
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-md w-full shadow-2xl overflow-hidden animate-in fade-in zoom-in-95">
-        <div className="px-6 py-4 border-b border-slate-800 flex items-center justify-between bg-slate-950/50">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md select-none">
+      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl max-w-md w-full shadow-2xl overflow-hidden animate-in fade-in zoom-in-95">
+        <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between bg-slate-50 dark:bg-slate-950/50">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-400 flex items-center justify-center">
+            <div className="w-9 h-9 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-600 dark:text-amber-400 flex items-center justify-center">
               <ShieldAlert className="w-5 h-5" />
             </div>
             <div>
-              <h3 className="font-semibold text-white text-base">Re-Authentication Required</h3>
-              <p className="text-xs text-slate-400">Security policy check</p>
+              <h3 className="font-semibold text-slate-900 dark:text-white text-base">Re-Authentication Required</h3>
+              <p className="text-xs text-slate-500 dark:text-slate-400">Security policy check</p>
             </div>
           </div>
-          <button onClick={onClose} className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800">
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-700 dark:hover:text-white p-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800">
             <X className="w-5 h-5" />
           </button>
         </div>
 
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
-          <p className="text-xs text-slate-300">
-            Please re-enter your <strong>NetVaultT account password</strong> to confirm your identity before revealing sensitive device credentials.
+          <p className="text-xs text-slate-600 dark:text-slate-300">
+            Please re-enter your <strong className="text-slate-900 dark:text-white">NetVaultT account password</strong> to confirm your identity before revealing sensitive device credentials.
           </p>
 
           {error && (
-            <div className="p-3 rounded-lg bg-rose-500/10 border border-rose-500/20 text-rose-300 text-xs font-medium">
+            <div className="p-3 rounded-lg bg-rose-500/10 border border-rose-500/20 text-rose-700 dark:text-rose-300 text-xs font-medium">
               {error}
             </div>
           )}
 
           <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider block">
+            <label className="text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wider block">
               Account Password
             </label>
             <div className="relative">
@@ -71,9 +71,9 @@ export const ReAuthModal: React.FC<ReAuthModalProps> = ({ isOpen, onClose, onCon
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••••••"
-                className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-cyan-500 pl-10"
+                className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm text-slate-900 dark:text-white focus:outline-none focus:border-cyan-500 pl-10"
               />
-              <Lock className="w-4 h-4 text-slate-500 absolute left-3.5 top-3" />
+              <Lock className="w-4 h-4 text-slate-400 dark:text-slate-500 absolute left-3.5 top-3" />
             </div>
           </div>
 
@@ -81,7 +81,7 @@ export const ReAuthModal: React.FC<ReAuthModalProps> = ({ isOpen, onClose, onCon
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-sm font-medium transition-colors"
+              className="px-4 py-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-lg text-sm font-medium transition-colors"
             >
               Cancel
             </button>
@@ -98,4 +98,3 @@ export const ReAuthModal: React.FC<ReAuthModalProps> = ({ isOpen, onClose, onCon
     </div>
   );
 };
-

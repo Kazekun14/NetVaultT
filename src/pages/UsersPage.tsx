@@ -161,8 +161,8 @@ export const UsersPage: React.FC = () => {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-white tracking-tight">User Account Management</h1>
-          <p className="text-xs text-slate-400 mt-1">Manage authorized staff user accounts, role assignments, and statuses</p>
+          <h1 className="text-2xl font-bold text-slate-900 dark:text-white tracking-tight">User Account Management</h1>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Manage authorized staff user accounts, role assignments, and statuses</p>
         </div>
 
         {hasPermission('users.create') && (
@@ -175,29 +175,29 @@ export const UsersPage: React.FC = () => {
         )}
       </div>
 
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-xl">
+      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 shadow-sm dark:shadow-xl">
         <div className="relative">
           <input
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search users by name, username, email..."
-            className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-purple-500 pl-10"
+            className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2.5 text-xs text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:border-purple-500 pl-10"
           />
-          <Search className="w-4 h-4 text-slate-500 absolute left-3.5 top-3" />
+          <Search className="w-4 h-4 text-slate-400 dark:text-slate-500 absolute left-3.5 top-3" />
         </div>
       </div>
 
       {/* Users Table */}
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl shadow-xl overflow-hidden">
+      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm dark:shadow-xl overflow-hidden">
         {loading ? (
-          <div className="p-12 text-center text-slate-400 text-xs animate-pulse">Loading users...</div>
+          <div className="p-12 text-center text-slate-400 dark:text-slate-500 text-xs animate-pulse">Loading users...</div>
         ) : users.length === 0 ? (
-          <div className="p-12 text-center text-slate-400 text-xs">No users found.</div>
+          <div className="p-12 text-center text-slate-500 dark:text-slate-400 text-xs">No users found.</div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs">
-              <thead className="text-slate-400 bg-slate-950/60 uppercase text-[10px] tracking-wider border-b border-slate-800">
+              <thead className="text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-950/60 uppercase text-[10px] tracking-wider border-b border-slate-200 dark:border-slate-800">
                 <tr>
                   <th className="px-6 py-3.5">Name</th>
                   <th className="px-4 py-3.5">Username</th>
@@ -207,16 +207,16 @@ export const UsersPage: React.FC = () => {
                   <th className="px-6 py-3.5 text-right">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-800/60 text-slate-300">
+              <tbody className="divide-y divide-slate-200 dark:divide-slate-800/60 text-slate-700 dark:text-slate-300">
                 {users.map((u) => (
-                  <tr key={u.id} className="hover:bg-slate-800/40 transition-colors">
-                    <td className="px-6 py-4 font-semibold text-white">
+                  <tr key={u.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
+                    <td className="px-6 py-4 font-semibold text-slate-900 dark:text-white">
                       {u.firstName} {u.lastName}
                     </td>
-                    <td className="px-4 py-4 font-mono text-cyan-400">{u.username}</td>
-                    <td className="px-4 py-4 text-slate-400">{u.email}</td>
+                    <td className="px-4 py-4 font-mono text-cyan-600 dark:text-cyan-400">{u.username}</td>
+                    <td className="px-4 py-4 text-slate-500 dark:text-slate-400">{u.email}</td>
                     <td className="px-4 py-4">
-                      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-purple-500/10 text-purple-400 border border-purple-500/20 text-xs font-semibold">
+                      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-purple-500/10 text-purple-700 dark:text-purple-400 border border-purple-500/20 text-xs font-semibold">
                         <Shield className="w-3 h-3" />
                         {u.roles?.[0]?.name || 'User'}
                       </span>
@@ -229,14 +229,14 @@ export const UsersPage: React.FC = () => {
                         <div className="flex items-center justify-end gap-2">
                           <button
                             onClick={() => handleOpenEdit(u)}
-                            className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800"
+                            className="p-1.5 text-slate-400 hover:text-slate-700 dark:hover:text-white rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800"
                             title="Edit User"
                           >
                             <Edit className="w-4 h-4" />
                           </button>
                           <button
                             onClick={() => setResetModalUser(u)}
-                            className="p-1.5 text-amber-400 hover:text-amber-300 rounded-lg hover:bg-slate-800"
+                            className="p-1.5 text-amber-600 dark:text-amber-400 hover:text-amber-700 dark:hover:text-amber-300 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800"
                             title="Reset User Password"
                           >
                             <Lock className="w-4 h-4" />
@@ -255,20 +255,20 @@ export const UsersPage: React.FC = () => {
       {/* Add / Edit User Modal */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-md w-full shadow-2xl overflow-hidden animate-in fade-in zoom-in-95">
-            <div className="px-6 py-4 border-b border-slate-800 flex items-center justify-between bg-slate-950/50">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl max-w-md w-full shadow-2xl overflow-hidden animate-in fade-in zoom-in-95">
+            <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between bg-slate-50 dark:bg-slate-950/50">
               <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-lg bg-purple-500/10 border border-purple-500/20 text-purple-400 flex items-center justify-center">
+                <div className="w-9 h-9 rounded-lg bg-purple-500/10 border border-purple-500/20 text-purple-600 dark:text-purple-400 flex items-center justify-center">
                   <UsersIcon className="w-5 h-5" />
                 </div>
                 <div>
-                  <h3 className="font-semibold text-white text-base">
+                  <h3 className="font-semibold text-slate-900 dark:text-white text-base">
                     {editingUser ? 'Edit User Account' : 'Add User Account'}
                   </h3>
-                  <p className="text-xs text-slate-400">Authorized staff user details</p>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">Authorized staff user details</p>
                 </div>
               </div>
-              <button onClick={() => setIsModalOpen(false)} className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800">
+              <button onClick={() => setIsModalOpen(false)} className="text-slate-400 hover:text-slate-700 dark:hover:text-white p-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800">
                 <X className="w-5 h-5" />
               </button>
             </div>
@@ -276,71 +276,71 @@ export const UsersPage: React.FC = () => {
             <form onSubmit={handleSubmit} className="p-6 space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1">
-                  <label className="text-xs font-semibold text-slate-400 uppercase">First Name *</label>
+                  <label className="text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase">First Name *</label>
                   <input
                     type="text"
                     required
                     value={formData.first_name}
                     onChange={(e) => setFormData({ ...formData, first_name: e.target.value })}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-purple-500"
+                    className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-purple-500"
                   />
                 </div>
 
                 <div className="space-y-1">
-                  <label className="text-xs font-semibold text-slate-400 uppercase">Last Name *</label>
+                  <label className="text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase">Last Name *</label>
                   <input
                     type="text"
                     required
                     value={formData.last_name}
                     onChange={(e) => setFormData({ ...formData, last_name: e.target.value })}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-purple-500"
+                    className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-purple-500"
                   />
                 </div>
               </div>
 
               <div className="space-y-1">
-                <label className="text-xs font-semibold text-slate-400 uppercase">Username *</label>
+                <label className="text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase">Username *</label>
                 <input
                   type="text"
                   required
                   disabled={Boolean(editingUser)}
                   value={formData.username}
                   onChange={(e) => setFormData({ ...formData, username: e.target.value })}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-cyan-400 font-mono focus:outline-none focus:border-purple-500 disabled:opacity-50"
+                  className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-xs text-cyan-600 dark:text-cyan-400 font-mono focus:outline-none focus:border-purple-500 disabled:opacity-50"
                 />
               </div>
 
               <div className="space-y-1">
-                <label className="text-xs font-semibold text-slate-400 uppercase">Email *</label>
+                <label className="text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase">Email *</label>
                 <input
                   type="email"
                   required
                   value={formData.email}
                   onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-purple-500"
+                  className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-purple-500"
                 />
               </div>
 
               {!editingUser && (
                 <div className="space-y-1">
-                  <label className="text-xs font-semibold text-slate-400 uppercase">Password *</label>
+                  <label className="text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase">Password *</label>
                   <input
                     type="password"
                     required
                     value={formData.password}
                     onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white font-mono focus:outline-none focus:border-purple-500"
+                    className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white font-mono focus:outline-none focus:border-purple-500"
                   />
                 </div>
               )}
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1">
-                  <label className="text-xs font-semibold text-slate-400 uppercase">Role *</label>
+                  <label className="text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase">Role *</label>
                   <select
                     value={formData.role_id}
                     onChange={(e) => setFormData({ ...formData, role_id: e.target.value })}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-purple-500"
+                    className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-purple-500"
                   >
                     {roles.map((r) => (
                       <option key={r.id} value={r.id}>
@@ -351,11 +351,11 @@ export const UsersPage: React.FC = () => {
                 </div>
 
                 <div className="space-y-1">
-                  <label className="text-xs font-semibold text-slate-400 uppercase">Status *</label>
+                  <label className="text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase">Status *</label>
                   <select
                     value={formData.status}
                     onChange={(e) => setFormData({ ...formData, status: e.target.value })}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-purple-500"
+                    className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-purple-500"
                   >
                     <option value="ACTIVE">ACTIVE</option>
                     <option value="DISABLED">DISABLED</option>
@@ -363,11 +363,11 @@ export const UsersPage: React.FC = () => {
                 </div>
               </div>
 
-              <div className="pt-3 flex justify-end gap-3 border-t border-slate-800">
+              <div className="pt-3 flex justify-end gap-3 border-t border-slate-200 dark:border-slate-800">
                 <button
                   type="button"
                   onClick={() => setIsModalOpen(false)}
-                  className="px-4 py-2 bg-slate-800 text-slate-300 rounded-lg text-xs font-medium"
+                  className="px-4 py-2 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-lg text-xs font-medium"
                 >
                   Cancel
                 </button>
@@ -388,32 +388,32 @@ export const UsersPage: React.FC = () => {
       {/* Reset Password Modal */}
       {resetModalUser && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-md w-full shadow-2xl overflow-hidden animate-in fade-in zoom-in-95">
-            <div className="px-6 py-4 border-b border-slate-800 flex items-center justify-between bg-slate-950/50">
-              <h3 className="font-semibold text-white text-base">Reset Password for {resetModalUser.username}</h3>
-              <button onClick={() => setResetModalUser(null)} className="text-slate-400 hover:text-white p-1">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl max-w-md w-full shadow-2xl overflow-hidden animate-in fade-in zoom-in-95">
+            <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between bg-slate-50 dark:bg-slate-950/50">
+              <h3 className="font-semibold text-slate-900 dark:text-white text-base">Reset Password for {resetModalUser.username}</h3>
+              <button onClick={() => setResetModalUser(null)} className="text-slate-400 hover:text-slate-700 dark:hover:text-white p-1">
                 <X className="w-5 h-5" />
               </button>
             </div>
 
             <form onSubmit={handleResetPassword} className="p-6 space-y-4">
               <div className="space-y-1">
-                <label className="text-xs font-semibold text-slate-400 uppercase">New Password *</label>
+                <label className="text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase">New Password *</label>
                 <input
                   type="password"
                   required
                   value={newPassword}
                   onChange={(e) => setNewPassword(e.target.value)}
                   placeholder="••••••••••••"
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-xs text-white font-mono focus:outline-none focus:border-amber-500"
+                  className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2.5 text-xs text-slate-900 dark:text-white font-mono focus:outline-none focus:border-amber-500"
                 />
               </div>
 
-              <div className="pt-2 flex justify-end gap-3 border-t border-slate-800">
+              <div className="pt-2 flex justify-end gap-3 border-t border-slate-200 dark:border-slate-800">
                 <button
                   type="button"
                   onClick={() => setResetModalUser(null)}
-                  className="px-4 py-2 bg-slate-800 text-slate-300 rounded-lg text-xs"
+                  className="px-4 py-2 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-lg text-xs"
                 >
                   Cancel
                 </button>
@@ -432,4 +432,3 @@ export const UsersPage: React.FC = () => {
     </div>
   );
 };
-

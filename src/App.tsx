@@ -1,6 +1,7 @@
 import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext.js';
+import { ThemeProvider } from './context/ThemeContext.js';
 import { ToastProvider } from './components/common/Toast.js';
 import { AppLayout } from './components/layout/AppLayout.js';
 
@@ -48,8 +49,9 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode; perm?: string }> = (
 export function App() {
   return (
     <BrowserRouter>
-      <AuthProvider>
-        <ToastProvider>
+      <ThemeProvider>
+        <AuthProvider>
+          <ToastProvider>
           <Routes>
             <Route path="/signin" element={<SignInPage />} />
 
@@ -157,7 +159,8 @@ export function App() {
           </Routes>
         </ToastProvider>
       </AuthProvider>
-    </BrowserRouter>
+    </ThemeProvider>
+  </BrowserRouter>
   );
 }
 
