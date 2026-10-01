@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Sidebar } from './Sidebar.js';
-import { Header } from './Header.js';
 import { Outlet } from 'react-router-dom';
+import { Menu } from 'lucide-react';
 
 export const AppLayout: React.FC = () => {
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -14,19 +14,29 @@ export const AppLayout: React.FC = () => {
   }, [collapsed]);
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex flex-col text-slate-900 dark:text-slate-100 font-sans transition-colors duration-200">
-      <Header
+    <div className="h-screen w-screen flex overflow-hidden bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 font-sans transition-colors duration-200">
+      {/* Full-Height Sidebar on Left Column */}
+      <Sidebar
         collapsed={collapsed}
         setCollapsed={setCollapsed}
+        mobileOpen={mobileOpen}
         setMobileOpen={setMobileOpen}
       />
-      <div className="flex-1 flex min-w-0">
-        <Sidebar
-          collapsed={collapsed}
-          mobileOpen={mobileOpen}
-          setMobileOpen={setMobileOpen}
-        />
-        <main className="flex-1 p-3 sm:p-6 lg:p-8 max-w-7xl w-full mx-auto min-w-0">
+
+      {/* Main Content Area starting directly to the right of Sidebar */}
+      <div className="flex-1 overflow-y-auto min-w-0 w-full h-screen relative">
+        {/* Mobile Menu Floating Trigger (Visible only on mobile lg:hidden) */}
+        <div className="lg:hidden fixed top-4 left-4 z-30">
+          <button
+            onClick={() => setMobileOpen(true)}
+            className="p-2.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-200 shadow-lg flex items-center justify-center"
+            aria-label="Open sidebar menu"
+          >
+            <Menu className="w-5 h-5" />
+          </button>
+        </div>
+
+        <main className="p-5 sm:p-6 max-w-[1600px] w-full mx-auto min-w-0">
           <Outlet />
         </main>
       </div>

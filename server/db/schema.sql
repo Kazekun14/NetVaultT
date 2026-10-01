@@ -1,4 +1,4 @@
--- NetVaultT Database Schema (SQLite / PostgreSQL compatible)
+-- NetVaultT Database Schema (PostgreSQL)
 
 CREATE TABLE IF NOT EXISTS users (
     id TEXT PRIMARY KEY,

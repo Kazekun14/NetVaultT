@@ -134,7 +134,7 @@ export const AddEditDevicePage: React.FC = () => {
   }
 
   return (
-    <div className="max-w-4xl mx-auto space-y-4">
+    <div className="w-full space-y-4">
       {/* Back Link */}
       <div>
         <Link

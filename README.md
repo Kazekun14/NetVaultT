@@ -57,22 +57,24 @@
    node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
    ```
 
-3. **Database Migration & Seeding**:
-   Apply safe `CREATE TABLE/INDEX IF NOT EXISTS` statements to the existing database:
+3. **Database Setup & Initial Administrator**:
+   First, create the PostgreSQL schema:
    ```bash
    npm run db:migrate
    ```
-   This does not migrate SQLite data, replace tables, or redesign columns. To add missing default roles, permissions, sites, sample devices, and settings, run:
+   `db:migrate` creates all required database tables and performance indexes.
+
+   Next, seed reference and configuration data:
    ```bash
    npm run db:seed
    ```
+   `db:seed` populates system permissions, roles, role-permission mappings, device types, and system settings. It does not create user accounts, sites, devices, or credentials.
 
-   Startup awaits schema initialization and the same transactional, insert-if-missing seed before listening. Existing password hashes, IDs, and encrypted credentials are preserved.
-
-4. **Create Initial Administrator (Optional CLI Setup)**:
+   Finally, interactively create the initial Super Administrator:
    ```bash
    npm run create-admin
    ```
+   `create-admin` prompts for the initial Super Administrator credentials and password with masked input. There is no default administrator password.
 
 ---
 
@@ -91,11 +93,6 @@ This starts both servers and stops the frontend if the backend exits. `npm run d
 * **API Endpoints**: `http://localhost:5000/api`
 
 If login reports `Server returned invalid response (500)`, check the backend terminal for a startup failure. Verify PostgreSQL is reachable and the `DB_*` configuration is correct, then restart `npm run dev`.
-
-### Default Login Credentials (Development Seed Only)
-* **Username**: `admin`
-* **Password**: `Admin123!NetVaultT`
-*(Force password change on first login recommended)*
 
 ---
 

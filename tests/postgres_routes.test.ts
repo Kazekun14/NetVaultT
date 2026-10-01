@@ -2,7 +2,7 @@ import { describe, it, expect, afterAll, beforeAll } from 'vitest';
 import express from 'express';
 import session from 'express-session';
 import request from 'supertest';
-import { db, execute, queryOne, initDb, getIsSqlite } from '../server/db/index.js';
+import { db, execute, queryOne, initDb, getTransactionClient, withTransactionClient } from '../server/db/index.js';
 import { hashPassword } from '../server/services/password.service.js';
 import { isolated } from './postgres-fixture.js';
 import auth from '../server/routes/auth.routes.js';
@@ -21,9 +21,9 @@ beforeAll(async () => {
 
 afterAll(() => db.end());
 
-it('runs authenticated API workflows, filters, authorization, and rollback against isolated PostgreSQL tables', async (ctx) => {
-  if (getIsSqlite()) ctx.skip();
+it('runs authenticated API workflows, filters, authorization, and rollback against isolated PostgreSQL tables', async () => {
   await isolated(async () => {
+    const isolatedClient = getTransactionClient();
     const now = new Date().toISOString();
     const password = 'TemporaryTestPassword!';
     const hash = await hashPassword(password);
@@ -40,6 +40,11 @@ it('runs authenticated API workflows, filters, authorization, and rollback again
       await execute('INSERT INTO system_settings(id,setting_key,setting_value,setting_type,updated_at) VALUES ($1,$1,$2,$3,$4)',[key,value,type,now]);
     }
     const app = express();
+    if (isolatedClient) {
+      app.use((_req, _res, next) => {
+        withTransactionClient(isolatedClient, next);
+      });
+    }
     app.use(express.json());
     app.use(session({secret:'isolated-test-session-secret',resave:false,saveUninitialized:false}));
     for (const [path,router] of Object.entries({auth,devices,credentials,sites,users,roles,settings,'audit-logs':audit,dashboard})) app.use('/api/'+path,router);

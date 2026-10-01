@@ -52,7 +52,7 @@ export const ProfilePage: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6 max-w-3xl mx-auto">
+    <div className="space-y-6 w-full">
       <div>
         <h1 className="text-2xl font-bold text-slate-900 dark:text-white tracking-tight">My Profile & Security</h1>
         <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Manage your account information and change your login password</p>

@@ -1,5 +1,5 @@
 import { describe, it, expect, afterAll, beforeAll } from 'vitest';
-import { db, execute, queryOne, query, transaction, initDb, getIsSqlite } from '../server/db/index.js';
+import { db, execute, queryOne, query, transaction, initDb } from '../server/db/index.js';
 import { encryptSecret, decryptSecret } from '../server/services/encryption.service.js';
 import { logAudit } from '../server/services/audit.service.js';
 
@@ -12,8 +12,7 @@ beforeAll(async () => {
 afterAll(() => db.end());
 
 describe('PostgreSQL credential and audit integration', () => {
-  it('commits read-only work and releases clients on success and failure', async (ctx) => {
-    if (getIsSqlite()) ctx.skip();
+  it('commits read-only work and releases clients on success and failure', async () => {
     expect(await transaction(async () => (await queryOne('SELECT 42::int AS value'))?.value)).toBe(42);
     await expect(transaction(async () => { throw new Error('rollback'); })).rejects.toThrow('rollback');
     expect(db.idleCount).toBe(db.totalCount);
@@ -26,8 +25,7 @@ describe('PostgreSQL credential and audit integration', () => {
     expect(new Set(pids).size).toBe(2);
   });
 
-  it('stores encrypted secrets and awaits audit persistence without touching public tables', async (ctx) => {
-    if (getIsSqlite()) ctx.skip();
+  it('stores encrypted secrets and awaits audit persistence without touching public tables', async () => {
     await isolated(async () => {
       const now = new Date().toISOString();
       await execute("INSERT INTO sites (id,code,name,created_at,updated_at) VALUES ('site','TEST','Test',$1,$1)", [now]);
@@ -45,8 +43,7 @@ describe('PostgreSQL credential and audit integration', () => {
     });
   });
 
-  it('rolls back nested writes and keeps nested helpers on the same client', async (ctx) => {
-    if (getIsSqlite()) ctx.skip();
+  it('rolls back nested writes and keeps nested helpers on the same client', async () => {
     await isolated(async () => {
       const outer = await queryOne('SELECT pg_backend_pid() AS pid');
       await expect(transaction(async () => {

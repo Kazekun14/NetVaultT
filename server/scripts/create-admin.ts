@@ -3,13 +3,39 @@ import { hashPassword } from '../services/password.service.js';
 import crypto from 'crypto';
 import readline from 'readline';
 
-const rl = readline.createInterface({
-  input: process.stdin,
-  output: process.stdout,
-});
-
 function ask(question: string): Promise<string> {
-  return new Promise((resolve) => rl.question(question, resolve));
+  return new Promise((resolve) => {
+    const rl = readline.createInterface({
+      input: process.stdin,
+      output: process.stdout,
+    });
+    rl.question(question, (answer) => {
+      rl.close();
+      resolve(answer);
+    });
+  });
+}
+
+function askPassword(question: string): Promise<string> {
+  return new Promise((resolve) => {
+    const rl = readline.createInterface({
+      input: process.stdin,
+      output: process.stdout,
+    });
+    let muted = false;
+    (rl as any)._writeToOutput = function _writeToOutput(stringToWrite: string) {
+      if (!muted) {
+        process.stdout.write(stringToWrite);
+      }
+    };
+    process.stdout.write(question);
+    muted = true;
+    rl.question('', (answer) => {
+      rl.close();
+      process.stdout.write('\n');
+      resolve(answer);
+    });
+  });
 }
 
 async function createAdmin() {
@@ -20,11 +46,17 @@ async function createAdmin() {
   const email = (await ask('Enter Email [admin@netvaultt.internal]: ')).trim() || 'admin@netvaultt.internal';
   const firstName = (await ask('Enter First Name [System]: ')).trim() || 'System';
   const lastName = (await ask('Enter Last Name [Administrator]: ')).trim() || 'Administrator';
-  const password = await ask('Enter Password: ');
+  const password = await askPassword('Enter Password: ');
+  const confirmPassword = await askPassword('Confirm Password: ');
 
   if (!password || password.length < 8) {
     console.error('Error: Password must be at least 8 characters long.');
-    rl.close();
+    process.exitCode = 1;
+    return;
+  }
+
+  if (password !== confirmPassword) {
+    console.error('Error: Password and confirmation do not match.');
     process.exitCode = 1;
     return;
   }
@@ -32,7 +64,6 @@ async function createAdmin() {
   const existingUser = await queryOne('SELECT id FROM users WHERE username = $1 OR email = $2', [username, email]);
   if (existingUser) {
     console.error(`Error: User with username "${username}" or email "${email}" already exists.`);
-    rl.close();
     process.exitCode = 1;
     return;
   }
@@ -40,7 +71,6 @@ async function createAdmin() {
   const superAdminRole = await queryOne<{ id: string }>('SELECT id FROM roles WHERE name = $1', ['Super Administrator']);
   if (!superAdminRole) {
     console.error('Error: Super Administrator role not found in database. Run npm run db:seed first.');
-    rl.close();
     process.exitCode = 1;
     return;
   }
@@ -60,11 +90,11 @@ async function createAdmin() {
   });
 
   console.log(`\nSuper Administrator "${username}" created successfully!`);
-  rl.close();
 }
 
-createAdmin().catch((err) => {
-  console.error('Create admin error:', databaseErrorCode(err));
-  rl.close();
-  process.exitCode = 1;
-}).finally(() => db.end());
+createAdmin()
+  .catch((err) => {
+    console.error('Create admin error:', databaseErrorCode(err));
+    process.exitCode = 1;
+  })
+  .finally(() => db.end());

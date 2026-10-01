@@ -253,8 +253,8 @@ router.post('/', requireAuth, requirePermission('devices.create'), asyncHandler(
 // Update Device
 router.patch('/:id', requireAuth, requirePermission('devices.update'), asyncHandler(async (req: AuthRequest, res) => {
   const { id } = req.params;
-  const existing = await queryOne<{ id: string; device_name: string; device_type_id: string | null; site_id: string | null; management_ip: string | null }>(
-    'SELECT id, device_name, device_type_id, site_id, management_ip FROM devices WHERE id = $1',
+  const existing = await queryOne<any>(
+    'SELECT * FROM devices WHERE id = $1',
     [id]
   );
   if (!existing) {
@@ -291,21 +291,52 @@ router.patch('/:id', requireAuth, requirePermission('devices.update'), asyncHand
   } = req.body;
 
   const parsePort = (val: any, defaultVal: number) => {
-    if (val === undefined || val === null || val === '') return defaultVal;
+    if (val === undefined) return defaultVal;
+    if (val === null || val === '') return defaultVal;
     const num = parseInt(val, 10);
     return isNaN(num) ? defaultVal : num;
   };
 
-  const parseNullableInt = (val: any) => {
-    if (val === undefined || val === null || val === '') return null;
+  const parseNullableInt = (val: any, existingVal: any) => {
+    if (val === undefined) return existingVal;
+    if (val === null || val === '') return null;
     const num = parseInt(val, 10);
-    return isNaN(num) ? null : num;
+    return isNaN(num) ? existingVal : num;
+  };
+
+  const parseNullableStr = (val: any, existingVal: any) => {
+    if (val === undefined) return existingVal;
+    if (val === null) return null;
+    const str = String(val).trim();
+    return str.length > 0 ? str : null;
   };
 
   const deviceNameVal = device_name && device_name.trim() ? device_name.trim() : existing.device_name;
   const deviceTypeIdVal = device_type_id !== undefined ? (device_type_id ? device_type_id : null) : existing.device_type_id;
   const siteIdVal = site_id !== undefined ? (site_id ? site_id : null) : existing.site_id;
-  const mgmtIpVal = management_ip !== undefined ? (management_ip && management_ip.trim() ? management_ip.trim() : null) : existing.management_ip;
+  const mgmtIpVal = parseNullableStr(management_ip, existing.management_ip);
+  const vendorVal = parseNullableStr(vendor, existing.vendor);
+  const modelVal = parseNullableStr(model, existing.model);
+  const hostnameVal = parseNullableStr(hostname, existing.hostname);
+  const mgmtVlanVal = parseNullableInt(management_vlan, existing.management_vlan);
+  const macAddressVal = parseNullableStr(mac_address, existing.mac_address);
+  const serialNumberVal = parseNullableStr(serial_number, existing.serial_number);
+  const assetTagVal = parseNullableStr(asset_tag, existing.asset_tag);
+  const sshPortVal = parsePort(ssh_port, existing.ssh_port ?? 22);
+  const httpPortVal = parsePort(http_port, existing.http_port ?? 80);
+  const httpsPortVal = parsePort(https_port, existing.https_port ?? 443);
+  const telnetPortVal = parsePort(telnet_port, existing.telnet_port ?? 23);
+  const snmpPortVal = parsePort(snmp_port, existing.snmp_port ?? 161);
+  const firmwareVal = parseNullableStr(firmware_version, existing.firmware_version);
+  const softwareVal = parseNullableStr(software_version, existing.software_version);
+  const rackVal = parseNullableStr(rack, existing.rack);
+  const rackUnitVal = parseNullableStr(rack_unit, existing.rack_unit);
+  const physicalLocationVal = parseNullableStr(physical_location, existing.physical_location);
+  const uplinkVal = parseNullableStr(uplink, existing.uplink);
+  const parentDeviceVal = parseNullableStr(parent_device, existing.parent_device);
+  const descriptionVal = parseNullableStr(description, existing.description);
+  const notesVal = parseNullableStr(notes, existing.notes);
+  const statusVal = status !== undefined ? (status || existing.status) : existing.status;
 
   const now = new Date().toISOString();
 
@@ -336,7 +367,7 @@ router.patch('/:id', requireAuth, requirePermission('devices.update'), asyncHand
       parent_device = $23,
       description = $24,
       notes = $25,
-      status = COALESCE($26, status),
+      status = $26,
       updated_by = $27,
       updated_at = $28
      WHERE id = $29`,
@@ -344,29 +375,29 @@ router.patch('/:id', requireAuth, requirePermission('devices.update'), asyncHand
       deviceNameVal,
       deviceTypeIdVal,
       siteIdVal,
-      vendor || null,
-      model || null,
+      vendorVal,
+      modelVal,
       mgmtIpVal,
-      hostname || null,
-      parseNullableInt(management_vlan),
-      mac_address || null,
-      serial_number || null,
-      asset_tag || null,
-      parsePort(ssh_port, 22),
-      parsePort(http_port, 80),
-      parsePort(https_port, 443),
-      parsePort(telnet_port, 23),
-      parsePort(snmp_port, 161),
-      firmware_version || null,
-      software_version || null,
-      rack || null,
-      rack_unit || null,
-      physical_location || null,
-      uplink || null,
-      parent_device || null,
-      description || null,
-      notes || null,
-      status || null,
+      hostnameVal,
+      mgmtVlanVal,
+      macAddressVal,
+      serialNumberVal,
+      assetTagVal,
+      sshPortVal,
+      httpPortVal,
+      httpsPortVal,
+      telnetPortVal,
+      snmpPortVal,
+      firmwareVal,
+      softwareVal,
+      rackVal,
+      rackUnitVal,
+      physicalLocationVal,
+      uplinkVal,
+      parentDeviceVal,
+      descriptionVal,
+      notesVal,
+      statusVal,
       req.user!.id,
       now,
       id,

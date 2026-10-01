@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { NavLink, useNavigate } from 'react-router-dom';
+import { NavLink, Link, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard,
   Router as RouterIcon,
@@ -14,16 +14,18 @@ import {
   LogOut,
   ChevronUp,
   Shield,
+  Sidebar as SidebarToggleIcon,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext.js';
 
 interface SidebarProps {
   collapsed: boolean;
+  setCollapsed: React.Dispatch<React.SetStateAction<boolean>>;
   mobileOpen: boolean;
   setMobileOpen: (open: boolean) => void;
 }
 
-export const Sidebar: React.FC<SidebarProps> = ({ collapsed, mobileOpen, setMobileOpen }) => {
+export const Sidebar: React.FC<SidebarProps> = ({ collapsed, setCollapsed, mobileOpen, setMobileOpen }) => {
   const { user, logout, hasPermission } = useAuth();
   const navigate = useNavigate();
   const [userMenuOpen, setUserMenuOpen] = useState(false);
@@ -74,18 +76,35 @@ export const Sidebar: React.FC<SidebarProps> = ({ collapsed, mobileOpen, setMobi
           isCollapsed ? 'w-20' : 'w-64'
         }`}
       >
-        {/* Mobile Drawer Header */}
-        {isMobile && (
-          <div className="flex items-center justify-between px-5 py-4 border-b border-slate-200 dark:border-slate-800">
-            <div className="flex items-center gap-3">
-              <img src="/netvaultt.svg" alt="NetVaultT" className="w-8 h-8 shrink-0 drop-shadow-md" />
-              <div>
+        {/* Sidebar Header with Logo and Sidebar Toggle Icon */}
+        <div className={`flex items-center h-16 shrink-0 select-none ${isCollapsed ? 'justify-center px-2' : 'justify-between px-4'}`}>
+          {!isCollapsed && (
+            <Link to="/" onClick={() => setMobileOpen(false)} className="flex items-center gap-3 min-w-0 group">
+              <img src="/netvaultt.svg" alt="NetVaultT" className="w-8 h-8 shrink-0 drop-shadow-md group-hover:scale-105 transition-transform" />
+              <div className="flex flex-col whitespace-nowrap overflow-hidden transition-all duration-300 ease-in-out max-w-[160px]">
                 <h1 className="font-bold text-slate-900 dark:text-white tracking-wider text-base font-mono leading-none">NetVaultT</h1>
-                <span className="text-[9px] text-cyan-600 dark:text-cyan-400 font-semibold tracking-wider uppercase block mt-1">
-                  Infrastructure Vault
-                </span>
               </div>
-            </div>
+            </Link>
+          )}
+
+          {/* Desktop Toggle Icon inside Sidebar */}
+          {!isMobile && (
+            <button
+              onClick={() => setCollapsed((prev) => !prev)}
+              className="p-2 rounded-xl bg-slate-100 dark:bg-slate-800/80 hover:bg-slate-200 dark:hover:bg-slate-700/80 border border-slate-200/80 dark:border-slate-700/80 text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white transition-all flex items-center justify-center shrink-0 shadow-sm"
+              title={collapsed ? 'Expand Sidebar' : 'Collapse Sidebar'}
+              aria-label={collapsed ? 'Expand Sidebar' : 'Collapse Sidebar'}
+            >
+              <SidebarToggleIcon
+                className={`w-5 h-5 transition-transform duration-200 ${
+                  collapsed ? 'text-cyan-600 dark:text-cyan-400 rotate-180' : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                }`}
+              />
+            </button>
+          )}
+
+          {/* Mobile Close Button */}
+          {isMobile && (
             <button
               onClick={() => setMobileOpen(false)}
               className="text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white p-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800"
@@ -93,8 +112,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ collapsed, mobileOpen, setMobi
             >
               <X className="w-5 h-5" />
             </button>
-          </div>
-        )}
+          )}
+        </div>
 
         {/* Navigation Links */}
         <div className={`flex-1 ${isCollapsed ? 'px-2' : 'px-3'} py-5 overflow-y-auto space-y-1.5 scrollbar-thin`}>
@@ -244,8 +263,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ collapsed, mobileOpen, setMobi
 
   return (
     <>
-      {/* Desktop Sticky Sidebar (below top navbar) */}
-      <aside className="hidden lg:block h-[calc(100vh-4rem)] sticky top-16 shrink-0 z-40">
+      {/* Desktop Full-Height Sidebar */}
+      <aside className="hidden lg:block h-screen shrink-0 z-40">
         {renderSidebarContent(false)}
       </aside>
 

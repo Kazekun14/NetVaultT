@@ -1,10 +1,8 @@
 import { initDb, execute, queryOne, transaction, db, databaseErrorCode } from './index.js';
-import { hashPassword } from '../services/password.service.js';
-import { encryptSecret } from '../services/encryption.service.js';
 import crypto from 'crypto';
 
 export async function seedDatabase() {
-  console.log('Seeding NetVaultT database...');
+  console.log('Seeding NetVaultT database reference configuration...');
   await initDb();
 
   await transaction(async () => {
@@ -46,7 +44,7 @@ export async function seedDatabase() {
       }
     }
 
-    // 2. Seed Roles
+    // 2. Seed Roles and Role Permissions
     const rolesList = [
       {
         name: 'Super Administrator',
@@ -125,27 +123,7 @@ export async function seedDatabase() {
       }
     }
 
-    // 3. Seed Default Super Admin User
-    const superAdminRole = await queryOne<{ id: string }>('SELECT id FROM roles WHERE name = $1', ['Super Administrator']);
-    const existingAdmin = await queryOne<{ id: string }>('SELECT id FROM users WHERE username = $1 OR username = $2', ['superadmin', 'admin']);
-
-    let adminUserId = existingAdmin?.id;
-    if (!existingAdmin) {
-      adminUserId = crypto.randomUUID();
-      const adminPasswordHash = await hashPassword('Admin123!NetVaultT');
-      await execute(
-        `INSERT INTO users (
-          id, first_name, last_name, username, email, password_hash, status, created_at, updated_at
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
-        [adminUserId, 'System', 'Administrator', 'superadmin', 'superadmin@netvaultt.internal', adminPasswordHash, 'ACTIVE', now, now]
-      );
-
-      if (superAdminRole) {
-        await execute('INSERT INTO user_roles (user_id, role_id) VALUES ($1, $2)', [adminUserId, superAdminRole.id]);
-      }
-    }
-
-    // 4. Seed Device Types
+    // 3. Seed Device Types
     const deviceTypesList = [
       { code: 'ROUTER', name: 'Router', description: 'Core/edge network router' },
       { code: 'MIKROTIK', name: 'MikroTik', description: 'MikroTik RouterBOARD or Cloud Core Router' },
@@ -174,7 +152,7 @@ export async function seedDatabase() {
       }
     }
 
-    // 5. Seed System Settings
+    // 4. Seed System Settings
     const defaultSettings = [
       { key: 'app_name', value: 'NetVaultT', type: 'string' },
       { key: 'organization_name', value: 'NetVaultT Enterprise Network', type: 'string' },
@@ -194,12 +172,12 @@ export async function seedDatabase() {
       if (!existing) {
         await execute(
           'INSERT INTO system_settings (id, setting_key, setting_value, setting_type, updated_by, updated_at) VALUES ($1, $2, $3, $4, $5, $6)',
-          [crypto.randomUUID(), s.key, s.value, s.type, adminUserId, now]
+          [crypto.randomUUID(), s.key, s.value, s.type, null, now]
         );
       }
     }
   });
-  console.log('Database seeding finished successfully.');
+  console.log('Database reference configuration seeding finished successfully.');
 }
 
 if (process.argv[1] && process.argv[1].endsWith('seed.ts')) {
@@ -211,4 +189,3 @@ if (process.argv[1] && process.argv[1].endsWith('seed.ts')) {
       return db.end();
     });
 }
-

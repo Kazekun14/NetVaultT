@@ -1,12 +1,14 @@
 import React, { useEffect, useState } from 'react';
 import { apiFetch } from '../lib/api.js';
 import { useAuth } from '../context/AuthContext.js';
+import { useTheme } from '../context/ThemeContext.js';
 import { useToast } from '../components/common/Toast.js';
-import { Save, ShieldAlert, RefreshCw, Layers } from 'lucide-react';
+import { Save, ShieldAlert, RefreshCw, Layers, Sun, Moon } from 'lucide-react';
 
 export const SettingsPage: React.FC = () => {
   const { hasPermission } = useAuth();
   const { showToast } = useToast();
+  const { theme, setTheme } = useTheme();
 
   const [settings, setSettings] = useState({
     app_name: 'NetVaultT',
@@ -78,7 +80,7 @@ export const SettingsPage: React.FC = () => {
   }
 
   return (
-    <div className="space-y-6 max-w-4xl mx-auto">
+    <div className="space-y-6 w-full">
       <div>
         <h1 className="text-2xl font-bold text-slate-900 dark:text-white tracking-tight">System Settings</h1>
         <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Configure global vault security controls, session behavior, and rotation thresholds</p>
@@ -142,7 +144,54 @@ export const SettingsPage: React.FC = () => {
           </div>
         </div>
 
-        {/* Security Controls */}
+        {/* Appearance & Interface Theme */}
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-sm dark:shadow-xl space-y-4">
+          <div className="flex items-center gap-3 border-b border-slate-200 dark:border-slate-800 pb-3">
+            {theme === 'dark' ? (
+              <Moon className="w-5 h-5 text-indigo-500 dark:text-indigo-400" />
+            ) : (
+              <Sun className="w-5 h-5 text-amber-500" />
+            )}
+            <h2 className="text-base font-bold text-slate-900 dark:text-white">Appearance & Interface Theme</h2>
+          </div>
+
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 bg-slate-50 dark:bg-slate-950 rounded-xl border border-slate-200 dark:border-slate-800">
+            <div>
+              <span className="font-bold text-slate-900 dark:text-white text-xs block">Interface Color Theme</span>
+              <span className="text-xs text-slate-500 dark:text-slate-400 block mt-0.5">
+                Switch between Light Mode and Dark Mode for the NetVaultT application interface.
+              </span>
+            </div>
+
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                type="button"
+                onClick={() => setTheme('light')}
+                className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-semibold border transition-all ${
+                  theme === 'light'
+                    ? 'bg-amber-500/10 border-amber-500/30 text-amber-700 dark:text-amber-400 ring-2 ring-amber-500/20 shadow-sm'
+                    : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
+                }`}
+              >
+                <Sun className="w-4 h-4 text-amber-500" />
+                <span>Light Mode</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setTheme('dark')}
+                className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-semibold border transition-all ${
+                  theme === 'dark'
+                    ? 'bg-indigo-500/10 border-indigo-500/30 text-indigo-600 dark:text-indigo-400 ring-2 ring-indigo-500/20 shadow-sm'
+                    : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
+                }`}
+              >
+                <Moon className="w-4 h-4 text-indigo-400" />
+                <span>Dark Mode</span>
+              </button>
+            </div>
+          </div>
+        </div>
         <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-sm dark:shadow-xl space-y-4">
           <div className="flex items-center gap-3 border-b border-slate-200 dark:border-slate-800 pb-3">
             <ShieldAlert className="w-5 h-5 text-amber-600 dark:text-amber-400" />
